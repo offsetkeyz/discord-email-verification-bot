@@ -2,8 +2,29 @@
 
 A serverless Discord bot for email verification using AWS Lambda, DynamoDB, and SES. Supports multi-guild configuration with custom email domains and verification messages.
 
+## 🚀 Quick Start
+
+**Deploy the entire AWS infrastructure in one command:**
+
+```bash
+# Configure AWS CLI
+aws configure
+
+# Clone and run setup
+git clone https://github.com/offsetkeyz/discord-email-verification-bot.git
+cd discord-email-verification-bot
+./setup-aws.sh
+```
+
+The automated setup script handles everything: DynamoDB tables, Lambda function, API Gateway, SES, IAM roles, and slash command registration. **Setup time: ~5 minutes.**
+
+See [Setup](#setup) for detailed instructions.
+
+---
+
 ## Features
 
+- **🚀 One-Command Deployment** - Automated `setup-aws.sh` script deploys entire infrastructure
 - **Serverless Architecture** - Runs on AWS Lambda with API Gateway webhook
 - **Multi-Guild Support** - Each Discord server can configure their own:
   - Allowed email domains
@@ -46,6 +67,7 @@ lambda/
 ├── guild_config.py             # Guild configuration management
 └── ssm_utils.py               # AWS SSM parameter store utils
 
+setup-aws.sh                    # Automated AWS deployment script
 register_slash_commands.py      # Script to register slash commands
 ```
 
