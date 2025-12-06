@@ -2,8 +2,29 @@
 
 A serverless Discord bot for email verification using AWS Lambda, DynamoDB, and SES. Supports multi-guild configuration with custom email domains and verification messages.
 
+## 🚀 Quick Start
+
+**Deploy the entire AWS infrastructure in one command:**
+
+```bash
+# Configure AWS CLI
+aws configure
+
+# Clone and run setup
+git clone https://github.com/offsetkeyz/discord-email-verification-bot.git
+cd discord-email-verification-bot
+./setup-aws.sh
+```
+
+The automated setup script handles everything: DynamoDB tables, Lambda function, API Gateway, SES, IAM roles, and slash command registration. **Setup time: ~5 minutes.**
+
+See [Setup](#setup) for detailed instructions.
+
+---
+
 ## Features
 
+- **🚀 One-Command Deployment** - Automated `setup-aws.sh` script deploys entire infrastructure
 - **Serverless Architecture** - Runs on AWS Lambda with API Gateway webhook
 - **Multi-Guild Support** - Each Discord server can configure their own:
   - Allowed email domains
@@ -46,6 +67,7 @@ lambda/
 ├── guild_config.py             # Guild configuration management
 └── ssm_utils.py               # AWS SSM parameter store utils
 
+setup-aws.sh                    # Automated AWS deployment script
 register_slash_commands.py      # Script to register slash commands
 ```
 
@@ -85,7 +107,41 @@ register_slash_commands.py      # Script to register slash commands
 
 ### 2. AWS Setup
 
-#### Create DynamoDB Tables
+**Choose one of the following setup methods:**
+
+#### Option A: Automated Setup (Recommended)
+
+We provide a setup script that automates the entire AWS deployment:
+
+```bash
+# Make sure you have AWS CLI configured
+aws configure
+
+# Run the setup script
+./setup-aws.sh
+```
+
+The script will:
+- ✅ Create all DynamoDB tables with proper schemas
+- ✅ Set up SES email verification
+- ✅ Create IAM role with appropriate permissions
+- ✅ Store bot token in SSM Parameter Store
+- ✅ Create Lambda function and layer
+- ✅ Set up API Gateway endpoint
+- ✅ Register Discord slash commands
+- ✅ Provide you with the webhook URL to configure in Discord
+
+**Time to complete:** ~5-10 minutes (mostly waiting for AWS resources)
+
+After the script completes, follow the "Next Steps" it provides to finish Discord configuration.
+
+---
+
+#### Option B: Manual Setup
+
+If you prefer to set up AWS resources manually, follow these detailed instructions:
+
+##### Create DynamoDB Tables
 
 ```bash
 # Sessions table (for active verification sessions)
@@ -259,6 +315,10 @@ aws lambda update-function-configuration \
 4. Discord will verify the endpoint (signature verification must be working)
 
 ### 3. Register Slash Commands
+
+**Note:** If you used the automated setup script (`./setup-aws.sh`), this step is already done. Skip to [Usage](#usage).
+
+**For manual setup only:**
 
 ```bash
 # Create .env file
