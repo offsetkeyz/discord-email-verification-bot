@@ -1,4 +1,12 @@
+# Project-specific files
 config.json
+lambda-deployment.zip
+discord-bot-dependencies.zip
+python/
+data/
+backups/
+.claude/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
