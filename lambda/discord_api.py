@@ -3,6 +3,7 @@ Discord REST API operations.
 Handles direct API calls to Discord (role assignment, etc.)
 """
 import requests
+from logging_utils import log_discord_error
 
 
 def user_has_role(user_id: str, guild_id: str, role_id: str, bot_token: str) -> bool:
@@ -31,10 +32,11 @@ def user_has_role(user_id: str, guild_id: str, role_id: str, bot_token: str) -> 
             member_data = response.json()
             user_roles = member_data.get('roles', [])
             has_role = role_id in user_roles
-            print(f"User {user_id} {'has' if has_role else 'does not have'} role {role_id}")
+            print(f"User {'has' if has_role else 'does not have'} role {role_id}")
             return has_role
         else:
-            print(f"Failed to get member info: {response.status_code} - {response.text}")
+            error_code = response.json().get('code') if response.content else None
+            log_discord_error('get_member', response.status_code, error_code)
             return False
 
     except Exception as e:
@@ -65,13 +67,14 @@ def assign_role(user_id: str, guild_id: str, role_id: str, bot_token: str) -> bo
         response = requests.put(url, headers=headers)
 
         if response.status_code == 204:
-            print(f"Successfully assigned role {role_id} to user {user_id}")
+            print(f"Successfully assigned role to user")
             return True
         elif response.status_code == 404:
-            print(f"User {user_id} or role {role_id} not found in guild {guild_id}")
+            print(f"User or role not found in guild")
             return False
         else:
-            print(f"Failed to assign role: {response.status_code} - {response.text}")
+            error_code = response.json().get('code') if response.content else None
+            log_discord_error('assign_role', response.status_code, error_code)
             return False
 
     except Exception as e:

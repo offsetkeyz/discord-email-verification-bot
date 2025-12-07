@@ -1,0 +1,74 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DynamoDBTableAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:${AWS_ACCOUNT_ID}:table/discord-verification-sessions",
+        "arn:aws:dynamodb:us-east-1:${AWS_ACCOUNT_ID}:table/discord-verification-records",
+        "arn:aws:dynamodb:us-east-1:${AWS_ACCOUNT_ID}:table/discord-guild-configs"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
+    },
+    {
+      "Sid": "DynamoDBIndexAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:Query"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:${AWS_ACCOUNT_ID}:table/discord-verification-sessions/index/*",
+        "arn:aws:dynamodb:us-east-1:${AWS_ACCOUNT_ID}:table/discord-verification-records/index/*",
+        "arn:aws:dynamodb:us-east-1:${AWS_ACCOUNT_ID}:table/discord-guild-configs/index/*"
+      ]
+    },
+    {
+      "Sid": "SESEmailSending",
+      "Effect": "Allow",
+      "Action": [
+        "ses:SendEmail"
+      ],
+      "Resource": [
+        "arn:aws:ses:us-east-1:${AWS_ACCOUNT_ID}:identity/${VERIFIED_EMAIL_ADDRESS}"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ses:FromAddress": "${VERIFIED_EMAIL_ADDRESS}"
+        }
+      }
+    },
+    {
+      "Sid": "SSMParameterReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter"
+      ],
+      "Resource": [
+        "arn:aws:ssm:us-east-1:${AWS_ACCOUNT_ID}:parameter/discord-bot/*"
+      ]
+    },
+    {
+      "Sid": "CloudWatchLogsAccess",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": [
+        "arn:aws:logs:us-east-1:${AWS_ACCOUNT_ID}:log-group:/aws/lambda/discord-verification-handler:*"
+      ]
+    }
+  ]
+}
