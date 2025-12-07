@@ -12,25 +12,56 @@ from discord_interactions import (
 )
 from guild_config import save_guild_config, get_guild_config, is_guild_configured
 from ssm_utils import get_parameter
+from validation_utils import (
+    extract_role_channel_from_custom_id,
+    extract_setup_id_from_custom_id,
+    validate_discord_message_url,
+    validate_discord_id
+)
 
 
 # Discord Permission: ADMINISTRATOR (0x8)
 ADMINISTRATOR_PERMISSION = 0x0000000008
 
 
-def has_admin_permissions(member: dict) -> bool:
+def has_admin_permissions(member: dict, guild_id: str) -> bool:
     """
-    Check if a Discord member has administrator permissions.
+    Check if a Discord member has administrator permissions with enhanced validation.
 
     Args:
         member: Discord member object from interaction
+        guild_id: Guild ID to validate against
 
     Returns:
         True if user is admin, False otherwise
     """
-    # Check if user has administrator permission
-    permissions = int(member.get('permissions', 0))
-    return (permissions & ADMINISTRATOR_PERMISSION) == ADMINISTRATOR_PERMISSION
+    # Validate guild context (prevent DM usage)
+    if not guild_id or guild_id == '@me':
+        print("ERROR: Command used outside of guild context")
+        return False
+
+    # Check permissions field exists
+    if 'permissions' not in member:
+        print("ERROR: Permissions field missing from member object")
+        return False
+
+    # Validate and parse permissions
+    try:
+        permissions = int(member['permissions'])
+    except (ValueError, TypeError) as e:
+        print(f"ERROR: Invalid permissions value: {member.get('permissions')} - {e}")
+        return False
+
+    # Check for Administrator permission bit
+    has_admin = (permissions & ADMINISTRATOR_PERMISSION) == ADMINISTRATOR_PERMISSION
+
+    # Log authorization check for security audit
+    user_id = member.get('user', {}).get('id', 'unknown')
+    user_name = member.get('user', {}).get('username', 'unknown')
+    print(f"Authorization check: user={user_name}({user_id}), guild={guild_id}, "
+          f"permissions={permissions}, admin={has_admin}")
+
+    return has_admin
 
 
 def handle_setup_command(interaction: dict) -> dict:
@@ -48,7 +79,7 @@ def handle_setup_command(interaction: dict) -> dict:
     guild_id = interaction.get('guild_id')
 
     # Check admin permissions
-    if not has_admin_permissions(member):
+    if not has_admin_permissions(member, guild_id):
         return ephemeral_response(
             "❌ You need **Administrator** permissions to run this command.\n\n"
             "Only server administrators can configure the verification bot."
@@ -300,15 +331,12 @@ def handle_domains_modal_submit(interaction: dict) -> dict:
     guild_id = interaction.get('guild_id')
     user_id = member.get('user', {}).get('id')
 
-    # Extract role_id and channel_id from custom_id
+    # Extract role_id and channel_id from custom_id (with security validation)
     custom_id = interaction['data']['custom_id']
-    # Format: setup_domains_modal_{role_id}_{channel_id}
-    parts = custom_id.split('_')
-    if len(parts) < 5:
-        return ephemeral_response("❌ Invalid setup state. Please run /setup again.")
+    role_id, channel_id = extract_role_channel_from_custom_id(custom_id, 'setup_domains_modal')
 
-    role_id = parts[3]
-    channel_id = parts[4]
+    if not role_id or not channel_id:
+        return ephemeral_response("❌ Invalid setup state. Please run /setup again.")
 
     # Get domains from modal
     components = interaction['data']['components']
@@ -421,11 +449,11 @@ def handle_skip_message_button(interaction: dict) -> dict:
     user_id = member.get('user', {}).get('id')
 
     custom_id = interaction['data']['custom_id']
-    # Format: setup_skip_message_{setup_id}
-    if not custom_id.startswith('setup_skip_message_'):
-        return ephemeral_response("❌ Invalid state. Please run /setup again.")
+    # Format: setup_skip_message_{setup_id} (with security validation)
+    setup_id = extract_setup_id_from_custom_id(custom_id, 'setup_skip_message')
 
-    setup_id = custom_id[19:]  # Remove 'setup_skip_message_' prefix
+    if not setup_id:
+        return ephemeral_response("❌ Invalid state. Please run /setup again.")
 
     # Get pending setup config
     pending_config = get_pending_setup(setup_id)
@@ -509,11 +537,11 @@ def handle_message_link_button(interaction: dict) -> dict:
         Lambda response dict
     """
     custom_id = interaction['data']['custom_id']
-    # Format: setup_message_link_{setup_id}
-    if not custom_id.startswith('setup_message_link_'):
-        return ephemeral_response("❌ Invalid state. Please run /setup again.")
+    # Format: setup_message_link_{setup_id} (with security validation)
+    setup_id = extract_setup_id_from_custom_id(custom_id, 'setup_message_link')
 
-    setup_id = custom_id[19:]  # Remove 'setup_message_link_' prefix
+    if not setup_id:
+        return ephemeral_response("❌ Invalid state. Please run /setup again.")
 
     # Show modal for message link input
     return {
@@ -564,13 +592,12 @@ def handle_message_modal_submit(interaction: dict) -> dict:
     guild_id = interaction.get('guild_id')
     user_id = member.get('user', {}).get('id')
 
-    # Extract setup_id from custom_id
+    # Extract setup_id from custom_id (with security validation)
     custom_id = interaction['data']['custom_id']
-    # Format: setup_link_modal_{setup_id}
-    if not custom_id.startswith('setup_link_modal_'):
-        return ephemeral_response("❌ Invalid setup state. Please run /setup again.")
+    setup_id = extract_setup_id_from_custom_id(custom_id, 'setup_link_modal')
 
-    setup_id = custom_id[17:]  # Remove 'setup_link_modal_' prefix
+    if not setup_id:
+        return ephemeral_response("❌ Invalid setup state. Please run /setup again.")
 
     # Get pending setup config
     config = get_pending_setup(setup_id)
@@ -588,25 +615,19 @@ def handle_message_modal_submit(interaction: dict) -> dict:
     if not message_link:
         return ephemeral_response("❌ Please provide a message link.")
 
-    # Parse message link: https://discord.com/channels/{guild_id}/{channel_id}/{message_id}
-    link_pattern = r'https://discord\.com/channels/(\d+)/(\d+)/(\d+)'
-    match = re.match(link_pattern, message_link)
+    # Parse and validate message link (with SSRF protection)
+    link_guild_id, link_channel_id, message_id = validate_discord_message_url(message_link, guild_id)
 
-    if not match:
+    if not link_guild_id:
         return ephemeral_response(
-            "❌ Invalid message link format.\n\n"
-            "Expected format: `https://discord.com/channels/...`\n\n"
+            "❌ Invalid message link.\n\n"
+            "Please provide a valid Discord message link from this server.\n\n"
             "To get a message link:\n"
             "1. Right-click your message\n"
             "2. Select **Copy Message Link**"
         )
 
-    link_guild_id, link_channel_id, message_id = match.groups()
-
-    # Verify the message is from the same guild
-    if link_guild_id != guild_id:
-        return ephemeral_response("❌ The message must be from this server.")
-
+    # Guild ID already verified by validation function
     # Fetch the message content
     try:
         bot_token = get_parameter('/discord-bot/token')
@@ -715,13 +736,12 @@ def handle_setup_approve(interaction: dict) -> dict:
     guild_id = interaction.get('guild_id')
     user_id = member.get('user', {}).get('id')
 
-    # Get setup_id from custom_id
+    # Get setup_id from custom_id (with security validation)
     custom_id = interaction['data']['custom_id']
-    # Format: setup_approve_{setup_id}
-    if not custom_id.startswith('setup_approve_'):
-        return ephemeral_response("❌ Invalid approval state. Please run /setup again.")
+    setup_id = extract_setup_id_from_custom_id(custom_id, 'setup_approve')
 
-    setup_id = custom_id[14:]  # Remove 'setup_approve_' prefix
+    if not setup_id:
+        return ephemeral_response("❌ Invalid approval state. Please run /setup again.")
 
     # Retrieve pending setup from DynamoDB
     config_data = get_pending_setup(setup_id)

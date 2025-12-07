@@ -5,6 +5,7 @@ Replaces the SMTP email_service.py from the original bot.
 import boto3
 import os
 from botocore.exceptions import ClientError
+from logging_utils import log_email_event
 
 
 # Initialize SES client
@@ -83,12 +84,12 @@ If you did not request this verification, please ignore this email.
         )
 
         message_id = response['MessageId']
-        print(f"Email sent successfully to {email}, MessageId: {message_id}")
+        log_email_event("sent", email, True, f"MessageId: {message_id}")
         return True
 
     except ClientError as e:
         error_message = e.response['Error']['Message']
-        print(f"Failed to send email to {email}: {error_message}")
+        log_email_event("sent", email, False, f"SES Error: {error_message}")
         return False
     except Exception as e:
         print(f"Unexpected error sending email: {e}")

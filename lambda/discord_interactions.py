@@ -55,7 +55,7 @@ class ButtonStyle(IntEnum):
 
 def verify_discord_signature(signature: str, timestamp: str, body: str) -> bool:
     """
-    Verify Discord interaction signature using Ed25519.
+    Verify Discord interaction signature using Ed25519 with replay protection.
 
     Args:
         signature: x-signature-ed25519 header
@@ -66,6 +66,23 @@ def verify_discord_signature(signature: str, timestamp: str, body: str) -> bool:
         True if signature is valid, False otherwise
     """
     try:
+        # Validate timestamp to prevent replay attacks
+        import time
+        try:
+            current_time = int(time.time())
+            request_time = int(timestamp)
+
+            # Reject requests older than 5 minutes or in the future
+            time_diff = abs(current_time - request_time)
+            if time_diff > 300:  # 5 minutes in seconds
+                print(f"ERROR: Request timestamp too old or in future. "
+                      f"Diff: {time_diff}s, Request: {request_time}, Current: {current_time}")
+                return False
+        except (ValueError, TypeError) as e:
+            print(f"ERROR: Invalid timestamp format: {e}")
+            return False
+
+        # Verify the Ed25519 signature
         public_key = os.environ.get('DISCORD_PUBLIC_KEY')
         if not public_key:
             print("ERROR: DISCORD_PUBLIC_KEY not found in environment")

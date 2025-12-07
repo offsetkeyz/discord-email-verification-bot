@@ -373,14 +373,24 @@ def delete_pending_message_capture(capture_id: str):
         print(f"Error deleting pending message capture: {e}")
 
 
-def check_rate_limit(user_id: str, guild_id: str, cooldown_seconds: int = 60) -> tuple[bool, int]:
+def check_rate_limit(
+    user_id: str,
+    guild_id: str,
+    cooldown_seconds: int = 60,
+    global_cooldown: int = 300  # 5 minutes globally
+) -> tuple[bool, int]:
     """
-    Check if user is rate limited (cooldown between verification attempts).
+    Check if user is rate limited with both per-guild and global limits.
+
+    Implements a two-tier rate limiting system:
+    1. Per-guild cooldown (default 60s) - prevents rapid retries in same server
+    2. Global cooldown (default 300s) - prevents abuse across multiple servers
 
     Args:
         user_id: Discord user ID
         guild_id: Discord guild ID
-        cooldown_seconds: Seconds to wait between attempts (default 60)
+        cooldown_seconds: Per-guild cooldown in seconds (default 60)
+        global_cooldown: Global per-user cooldown in seconds (default 300)
 
     Returns:
         Tuple of (is_allowed, seconds_remaining)
@@ -388,31 +398,54 @@ def check_rate_limit(user_id: str, guild_id: str, cooldown_seconds: int = 60) ->
         - seconds_remaining: Seconds left in cooldown (0 if allowed)
     """
     try:
+        # Check per-guild rate limit
         session = get_verification_session(user_id, guild_id)
 
-        if not session:
-            # No active session, user is allowed
-            return (True, 0)
+        if session:
+            # Check when session was created
+            created_at_str = session.get('created_at')
+            if created_at_str:
+                created_at = datetime.fromisoformat(created_at_str)
+                now = datetime.utcnow()
+                elapsed = (now - created_at).total_seconds()
 
-        # Check when session was created
-        created_at_str = session.get('created_at')
-        if not created_at_str:
-            return (True, 0)
+                if elapsed < cooldown_seconds:
+                    # Still in per-guild cooldown
+                    remaining = int(cooldown_seconds - elapsed)
+                    print(f"Per-guild rate limit: user {user_id} in guild {guild_id}, "
+                          f"{remaining}s remaining")
+                    return (False, remaining)
 
-        created_at = datetime.fromisoformat(created_at_str)
-        now = datetime.utcnow()
-        elapsed = (now - created_at).total_seconds()
+        # Check global rate limit (across all guilds)
+        global_session = get_verification_session(user_id, 'GLOBAL_RATE_LIMIT')
 
-        if elapsed < cooldown_seconds:
-            # Still in cooldown
-            remaining = int(cooldown_seconds - elapsed)
-            print(f"User {user_id} is rate limited. {remaining}s remaining.")
-            return (False, remaining)
-        else:
-            # Cooldown expired
-            return (True, 0)
+        if global_session:
+            created_at_str = global_session.get('created_at')
+            if created_at_str:
+                created_at = datetime.fromisoformat(created_at_str)
+                now = datetime.utcnow()
+                elapsed = (now - created_at).total_seconds()
+
+                if elapsed < global_cooldown:
+                    # Still in global cooldown
+                    remaining = int(global_cooldown - elapsed)
+                    print(f"Global rate limit: user {user_id}, {remaining}s remaining")
+                    return (False, remaining)
+
+        # Update global rate limit marker
+        ttl = int((datetime.utcnow() + timedelta(seconds=global_cooldown)).timestamp())
+        sessions_table.put_item(Item={
+            'user_id': user_id,
+            'guild_id': 'GLOBAL_RATE_LIMIT',
+            'created_at': datetime.utcnow().isoformat(),
+            'ttl': ttl
+        })
+
+        # User is allowed
+        return (True, 0)
 
     except Exception as e:
-        print(f"Error checking rate limit: {e}")
-        # On error, allow the request (fail open)
-        return (True, 0)
+        print(f"ERROR: Rate limit check failed: {e}")
+        # FAIL CLOSED - deny on error to prevent abuse
+        print("Denying request due to rate limit check failure (fail-safe)")
+        return (False, 60)  # Conservative 60s cooldown on error

@@ -24,6 +24,7 @@ from setup_handler import (
     handle_setup_approve,
     handle_setup_cancel
 )
+from logging_utils import log_safe
 
 
 def lambda_handler(event, context):
@@ -40,7 +41,7 @@ def lambda_handler(event, context):
     Returns:
         API Gateway response
     """
-    print(f"Event: {json.dumps(event)}")
+    log_safe("Received event", event)
 
     # Get headers and body
     headers = event.get('headers', {})
@@ -50,14 +51,20 @@ def lambda_handler(event, context):
     signature = headers.get('x-signature-ed25519', '')
     timestamp = headers.get('x-signature-timestamp', '')
 
-    # Verify signature
-    if signature and timestamp:
-        if not verify_discord_signature(signature, timestamp, body_str):
-            print("ERROR: Invalid Discord signature")
-            return {
-                'statusCode': 401,
-                'body': json.dumps({'error': 'Invalid signature'})
-            }
+    # Verify signature - MANDATORY (fail closed for security)
+    if not signature or not timestamp:
+        print("ERROR: Missing signature headers")
+        return {
+            'statusCode': 401,
+            'body': json.dumps({'error': 'Unauthorized - missing signature'})
+        }
+
+    if not verify_discord_signature(signature, timestamp, body_str):
+        print("ERROR: Invalid Discord signature")
+        return {
+            'statusCode': 401,
+            'body': json.dumps({'error': 'Unauthorized - invalid signature'})
+        }
 
     # Parse the body
     try:
