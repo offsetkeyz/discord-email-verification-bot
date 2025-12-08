@@ -55,6 +55,9 @@ class TestGetParameter:
 
     def test_get_parameter_success(self, mock_ssm_parameters):
         """Test successful parameter retrieval."""
+        # Clear cache to ensure we get the mocked value, not a cached one
+        get_parameter.cache_clear()
+
         # The mock_ssm_parameters fixture creates '/discord-bot/token'
         result = get_parameter('/discord-bot/token')
 
