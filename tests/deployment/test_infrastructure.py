@@ -851,10 +851,13 @@ class TestNetworkConfiguration:
 
         Discord API: https://discord.com/api/v10
         """
-        discord_api_url = 'https://discord.com/api/v10'
+        from urllib.parse import urlparse
 
-        # Document requirement
-        assert 'discord.com' in discord_api_url, \
+        discord_api_url = 'https://discord.com/api/v10'
+        parsed = urlparse(discord_api_url)
+
+        # Document requirement - use proper hostname parsing
+        assert parsed.hostname == 'discord.com', \
             "Lambda must be able to reach Discord API over HTTPS"
 
     def test_lambda_can_reach_aws_services_same_region(self):
