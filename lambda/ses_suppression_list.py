@@ -126,16 +126,14 @@ def get_suppression_stats() -> Dict[str, int]:
 
     try:
         # Scan for bounces
-        bounce_response = suppression_table.query(
-            IndexName='reason-index',  # Assumes GSI exists
-            KeyConditionExpression='reason = :reason',
+        bounce_response = suppression_table.scan(
+            FilterExpression='reason = :reason',
             ExpressionAttributeValues={':reason': 'bounce'},
             Select='COUNT'
         )
 
-        complaint_response = suppression_table.query(
-            IndexName='reason-index',
-            KeyConditionExpression='reason = :reason',
+        complaint_response = suppression_table.scan(
+            FilterExpression='reason = :reason',
             ExpressionAttributeValues={':reason': 'complaint'},
             Select='COUNT'
         )
