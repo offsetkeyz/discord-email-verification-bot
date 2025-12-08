@@ -1,0 +1,43 @@
+Documentation Cleanup - December 8, 2025
+========================================
+
+Project Status: Production-ready, post-testing cleanup
+
+Files Archived: 13 documentation files
+Archive Location: docs/archive/
+
+REMAINING IN ROOT (3 files):
+  ✓ README.md                    - Main project documentation
+  ✓ SECURITY.md                  - Security procedures
+  ✓ DEPLOYMENT_CHECKLIST.md      - Deployment guide
+
+ARCHIVED FILES:
+
+Testing Phase Docs (5 files) → docs/archive/testing-phase/
+  - TESTING_SUMMARY.md
+  - TESTING_QUICK_START.md
+  - DISCORD_SERVER_TESTING_PLAN.md
+  - FRESH_DEPLOYMENT_TEST_PLAN.md
+  - SES_SANDBOX_GUIDE.md
+
+Development Artifacts (5 files) → docs/archive/development/
+  - AWS-SETUP-REVIEW-REPORT.md
+  - PHASE_4B_DEPLOYMENT_TESTS_REPORT.md
+  - TESTING_ROADMAP.md
+  - SECURITY_FIXES_SUMMARY.md
+  - DEPLOYMENT-CHECKLIST.md (duplicate)
+
+Tooling Files (3 files) → docs/archive/tooling/
+  - ORCHESTRATOR-QUICK-START.md
+  - package.json
+  - package-lock.json
+
+Rationale:
+  - Testing phases complete (Phases 1-4)
+  - All PRs merged (#15, #16, #17)
+  - Test coverage: 94.34% (737 tests)
+  - SES out of sandbox mode
+  - Ready for production deployment
+  - Archive preserves development history
+
+Root directory now clean and professional with only essential production docs.

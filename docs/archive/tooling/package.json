@@ -1,0 +1,19 @@
+{
+  "name": "au-discord-bot-orchestrator",
+  "version": "1.0.0",
+  "description": "Autonomous orchestration script for Phase 3 development",
+  "main": "phase3-orchestrator.js",
+  "scripts": {
+    "orchestrate": "node phase3-orchestrator.js",
+    "test": "echo \"No tests for orchestrator\""
+  },
+  "keywords": ["claude", "orchestration", "automation", "testing"],
+  "author": "offsetkeyz",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

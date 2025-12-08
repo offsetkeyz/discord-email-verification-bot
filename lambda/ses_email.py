@@ -9,7 +9,7 @@ from logging_utils import log_email_event
 
 
 # Initialize SES client
-ses_client = boto3.client('ses', region_name='us-east-1')
+ses_client = boto3.client('ses', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
 
 
 def send_verification_email(email: str, code: str) -> bool:

@@ -329,7 +329,7 @@ EOF
     log_info "Attaching policy to role..."
     aws iam put-role-policy \
         --role-name $ROLE_NAME \
-        --policy-name discord-verification-policy \
+        --policy-name discord-verification-lambda-policy \
         --policy-document "$ROLE_POLICY"
 
     log_info "✓ IAM role configured"
@@ -375,7 +375,7 @@ create_lambda_layer() {
     mkdir -p "$LAYER_DIR/python"
 
     log_info "Installing Python dependencies..."
-    pip install -r requirements.txt -t "$LAYER_DIR/python" --quiet
+    pip install -r lambda-requirements.txt -t "$LAYER_DIR/python" --quiet
 
     # Create zip
     log_info "Creating layer package..."
@@ -426,7 +426,9 @@ create_lambda_function() {
                 DYNAMODB_RECORDS_TABLE=$RECORDS_TABLE,
                 DYNAMODB_GUILD_CONFIGS_TABLE=$CONFIGS_TABLE,
                 DISCORD_PUBLIC_KEY=$DISCORD_PUBLIC_KEY,
-                FROM_EMAIL=$FROM_EMAIL
+                DISCORD_APP_ID=$DISCORD_APP_ID,
+                FROM_EMAIL=$FROM_EMAIL,
+                AWS_REGION=$REGION
             }" \
             --region $REGION > /dev/null
 
@@ -446,7 +448,9 @@ create_lambda_function() {
                 DYNAMODB_RECORDS_TABLE=$RECORDS_TABLE,
                 DYNAMODB_GUILD_CONFIGS_TABLE=$CONFIGS_TABLE,
                 DISCORD_PUBLIC_KEY=$DISCORD_PUBLIC_KEY,
-                FROM_EMAIL=$FROM_EMAIL
+                DISCORD_APP_ID=$DISCORD_APP_ID,
+                FROM_EMAIL=$FROM_EMAIL,
+                AWS_REGION=$REGION
             }" \
             --region $REGION \
             --query 'FunctionArn' \
@@ -551,6 +555,9 @@ DISCORD_PUBLIC_KEY=$DISCORD_PUBLIC_KEY
 
 # Email address to send verification codes from (must be verified in AWS SES)
 FROM_EMAIL=$FROM_EMAIL
+
+# AWS Region (should match where your resources are deployed)
+AWS_REGION=$REGION
 EOF
 
     log_info "✓ .env file updated"

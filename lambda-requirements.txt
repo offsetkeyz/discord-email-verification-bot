@@ -1,0 +1,12 @@
+# Lambda Layer Dependencies
+# These are the ONLY dependencies needed for AWS Lambda deployment
+# DO NOT add discord.py, py-cord, or other local bot dependencies here
+
+# Ed25519 signature verification for Discord interactions
+PyNaCl>=1.5.0
+
+# HTTP requests to Discord API
+requests>=2.31.0
+
+# Note: boto3 and botocore are provided by AWS Lambda runtime
+# Do not include them in the layer as they are already available
