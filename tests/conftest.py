@@ -377,6 +377,59 @@ def get_table_item_count(dynamodb_table):
     return response.get('Count', 0)
 
 
+# ==============================================================================
+# Integration Test Fixtures (Phase 3A+)
+# ==============================================================================
+
+@pytest.fixture
+def integration_mock_env(mock_dynamodb_tables, mock_ses_service, mock_ssm_parameters):
+    """Complete integration environment with all AWS services mocked."""
+    from unittest.mock import patch
+
+    # Patch all module-level clients
+    with patch('dynamodb_operations.sessions_table', mock_dynamodb_tables['sessions']), \
+         patch('dynamodb_operations.records_table', mock_dynamodb_tables['records']), \
+         patch('guild_config.configs_table', mock_dynamodb_tables['configs']), \
+         patch('ses_email.ses_client', mock_ses_service), \
+         patch('ssm_utils.ssm_client', mock_ssm_parameters):
+
+        yield {
+            'dynamodb': mock_dynamodb_tables,
+            'ses': mock_ses_service,
+            'ssm': mock_ssm_parameters
+        }
+
+
+@pytest.fixture
+def setup_test_guild(integration_mock_env):
+    """Set up a test guild configuration."""
+    import sys
+    from pathlib import Path
+
+    # Add lambda directory to path if not already there
+    lambda_dir = Path(__file__).parent.parent / 'lambda'
+    if str(lambda_dir) not in sys.path:
+        sys.path.insert(0, str(lambda_dir))
+
+    from guild_config import save_guild_config
+
+    save_guild_config(
+        guild_id='test_guild_123',
+        role_id='verified_role_456',
+        channel_id='verify_channel_789',
+        setup_by_user_id='admin_user_001',
+        allowed_domains=['auburn.edu', 'test.edu'],
+        custom_message='Welcome! Please verify your .edu email to gain access.'
+    )
+
+    return {
+        'guild_id': 'test_guild_123',
+        'role_id': 'verified_role_456',
+        'channel_id': 'verify_channel_789',
+        'user_id': 'test_user_999'
+    }
+
+
 # Make helper functions available to tests
 pytest.create_api_gateway_event = create_api_gateway_event
 pytest.assert_response_status = assert_response_status
