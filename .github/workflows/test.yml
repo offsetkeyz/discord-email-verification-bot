@@ -35,13 +35,17 @@ jobs:
           flake8 lambda/ tests/ --max-line-length=100 || echo "Flake8 issues found"
 
       - name: Run tests with coverage
+        env:
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+          AWS_DEFAULT_REGION: us-east-1
         run: |
           pytest tests/ -v \
             --cov=lambda \
             --cov-report=term-missing \
             --cov-report=xml \
             --cov-report=html \
-            --cov-fail-under=10 \
+            --cov-fail-under=30 \
             -m "not slow"
 
       - name: Upload coverage to Codecov
@@ -60,6 +64,10 @@ jobs:
           path: htmlcov/
 
       - name: Run security tests
+        env:
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+          AWS_DEFAULT_REGION: us-east-1
         run: |
           pytest tests/ -v -m security || echo "No security tests yet"
 
@@ -84,5 +92,9 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run smoke tests
+        env:
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+          AWS_DEFAULT_REGION: us-east-1
         run: |
           pytest tests/ -v -m smoke || echo "No smoke tests yet"
