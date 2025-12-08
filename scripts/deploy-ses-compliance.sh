@@ -263,10 +263,17 @@ if aws lambda get-function --function-name $MAIN_LAMBDA &> /dev/null; then
     if echo "$CURRENT_ENV" | grep -q "SUPPRESSION_LIST_TABLE"; then
         warning "SUPPRESSION_LIST_TABLE already set in main Lambda"
     else
-        # This is a simplified update - in production, merge with existing vars
-        warning "Please manually add SUPPRESSION_LIST_TABLE=$SUPPRESSION_TABLE to $MAIN_LAMBDA environment"
-        warning "Run: aws lambda update-function-configuration --function-name $MAIN_LAMBDA --environment ..."
-    fi
+        # Automatically merge SUPPRESSION_LIST_TABLE into existing environment variables
+        if ! command -v jq &> /dev/null; then
+            warning "jq is not installed. Please install jq to automatically update Lambda environment variables."
+            warning "Or manually add SUPPRESSION_LIST_TABLE=$SUPPRESSION_TABLE to $MAIN_LAMBDA environment."
+        else
+            UPDATED_ENV=$(echo "$CURRENT_ENV" | jq --arg table "$SUPPRESSION_TABLE" '. + {SUPPRESSION_LIST_TABLE: $table}')
+            aws lambda update-function-configuration \
+                --function-name $MAIN_LAMBDA \
+                --environment "Variables=$UPDATED_ENV"
+            success "Added SUPPRESSION_LIST_TABLE=$SUPPRESSION_TABLE to $MAIN_LAMBDA environment"
+        fi
 else
     warning "Main Lambda function $MAIN_LAMBDA not found"
     warning "Skipping environment update"
