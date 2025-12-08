@@ -1,0 +1,46 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SESSuppressionListAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:Scan"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:*:table/ses-email-suppression-list",
+        "arn:aws:dynamodb:us-east-1:*:table/ses-email-suppression-list/index/*"
+      ]
+    },
+    {
+      "Sid": "CloudWatchMetricsPublish",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:PutMetricData"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "cloudwatch:namespace": "DiscordBot/SES"
+        }
+      }
+    },
+    {
+      "Sid": "CloudWatchLogsAccess",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": [
+        "arn:aws:logs:us-east-1:*:log-group:/aws/lambda/ses-notification-handler",
+        "arn:aws:logs:us-east-1:*:log-group:/aws/lambda/ses-notification-handler:*"
+      ]
+    }
+  ]
+}
