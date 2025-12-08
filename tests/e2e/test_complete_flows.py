@@ -273,7 +273,7 @@ class TestNewUserVerificationJourney:
         guild = setup_test_guild
 
         with patch('lambda_function.verify_discord_signature', return_value=True), \
-             patch('discord_api.user_has_role', return_value=True), \
+             patch('handlers.user_has_role', return_value=True), \
              patch('handlers.get_parameter', return_value='mock_bot_token'):
 
             # Try to start verification when already has role
@@ -405,16 +405,16 @@ class TestMultiStepErrorRecovery:
             email_event = create_email_modal_event('student@auburn.edu', guild['user_id'], guild['guild_id'])
             lambda_handler(email_event, lambda_context)
 
-            # Submit wrong code 5 times
-            for i in range(5):
+            # Submit wrong code 3 times (MAX_VERIFICATION_ATTEMPTS = 3)
+            for i in range(3):
                 wrong_code_event = create_code_modal_event('999999', guild['user_id'], guild['guild_id'])
                 response = lambda_handler(wrong_code_event, lambda_context)
 
-                if i == 4:  # Last attempt
+                if i == 2:  # Third (last) attempt
                     body = json.loads(response['body'])
                     assert 'Too many failed attempts' in body['data']['content'] or 'start over' in body['data']['content']
 
-            # Session should be deleted
+            # Session should be deleted after max attempts
             session = get_verification_session(guild['user_id'], guild['guild_id'])
             assert session is None
 

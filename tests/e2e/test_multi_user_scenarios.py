@@ -714,7 +714,7 @@ class TestRaceConditions:
 
         with patch('lambda_function.verify_discord_signature', return_value=True), \
              patch('handlers.user_has_role', return_value=False), \
-             patch('discord_api.assign_role', side_effect=slow_assign_role), \
+             patch('handlers.assign_role', side_effect=slow_assign_role), \
              patch('handlers.send_verification_email', return_value=True), \
              patch('handlers.get_parameter', return_value='mock_bot_token'):
 
