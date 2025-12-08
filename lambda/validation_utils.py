@@ -142,18 +142,12 @@ def validate_discord_message_url(url: str, expected_guild_id: str) -> Tuple[Opti
     if not url or not isinstance(url, str):
         return (None, None, None)
 
-    # Only allow discord.com URLs (prevent SSRF)
-    import urllib.parse
-    try:
-        parsed = urllib.parse.urlparse(url)
-        if parsed.netloc not in ['discord.com', 'www.discord.com']:
-            print(f"ERROR: Invalid Discord URL domain: {parsed.netloc}")
-            return (None, None, None)
-    except Exception as e:
-        print(f"ERROR: Failed to parse URL: {e}")
-        return (None, None, None)
-
-    # Validate format and extract IDs
+    # Validate format and extract IDs using strict regex (prevents SSRF and URL manipulation)
+    # This regex ensures:
+    # - Exact protocol: https://
+    # - Exact domain: discord.com (no subdomains, no TLD variations)
+    # - Exact path structure: /channels/{guild_id}/{channel_id}/{message_id}
+    # - No query parameters or fragments
     pattern = r'^https://discord\.com/channels/(\d{17,20})/(\d{17,20})/(\d{17,20})$'
     match = re.match(pattern, url)
 
