@@ -221,12 +221,14 @@ def delete_session(user_id: str, guild_id: str):
         print(f"Error deleting session: {e}")
 
 
-def store_pending_setup(setup_id: str, role_id: str, channel_id: str, allowed_domains: list, custom_message: str):
+def store_pending_setup(setup_id: str, user_id: str, guild_id: str, role_id: str, channel_id: str, allowed_domains: list, custom_message: str):
     """
     Store pending setup configuration temporarily (5 minute TTL).
 
     Args:
-        setup_id: Unique ID for this setup session (user_id_guild_id)
+        setup_id: Unique UUID for this setup session
+        user_id: Discord user ID of the admin performing setup
+        guild_id: Discord guild ID
         role_id: Discord role ID
         channel_id: Discord channel ID
         allowed_domains: List of allowed email domains
@@ -240,8 +242,10 @@ def store_pending_setup(setup_id: str, role_id: str, channel_id: str, allowed_do
 
         sessions_table.put_item(
             Item={
-                'user_id': setup_id,  # Reuse sessions table structure
-                'guild_id': 'PENDING_SETUP',  # Special marker
+                'user_id': f"setup_{setup_id}",  # Use setup_ prefix to avoid conflicts
+                'guild_id': guild_id,
+                'setup_id': setup_id,  # Store the UUID
+                'admin_user_id': user_id,  # Track who initiated setup
                 'role_id': role_id,
                 'channel_id': channel_id,
                 'allowed_domains': allowed_domains,
@@ -255,17 +259,31 @@ def store_pending_setup(setup_id: str, role_id: str, channel_id: str, allowed_do
         print(f"Error storing pending setup: {e}")
 
 
-def get_pending_setup(setup_id: str) -> dict:
+def get_pending_setup(setup_id: str, guild_id: str = None) -> dict:
     """
     Retrieve pending setup configuration.
 
     Args:
-        setup_id: Unique ID for this setup session
+        setup_id: Unique UUID for this setup session
+        guild_id: Discord guild ID (required for new UUID-based lookups)
 
     Returns:
         Dict with setup config or None if not found
     """
     try:
+        # Try new format first (with guild_id)
+        if guild_id:
+            response = sessions_table.get_item(
+                Key={
+                    'user_id': f"setup_{setup_id}",
+                    'guild_id': guild_id
+                }
+            )
+            item = response.get('Item')
+            if item:
+                return item
+
+        # Fallback to old format for backward compatibility
         response = sessions_table.get_item(
             Key={
                 'user_id': setup_id,
@@ -278,14 +296,27 @@ def get_pending_setup(setup_id: str) -> dict:
         return None
 
 
-def delete_pending_setup(setup_id: str):
+def delete_pending_setup(setup_id: str, guild_id: str = None):
     """
     Delete pending setup configuration.
 
     Args:
-        setup_id: Unique ID for this setup session
+        setup_id: Unique UUID for this setup session
+        guild_id: Discord guild ID (required for new UUID-based deletions)
     """
     try:
+        # Try new format first (with guild_id)
+        if guild_id:
+            sessions_table.delete_item(
+                Key={
+                    'user_id': f"setup_{setup_id}",
+                    'guild_id': guild_id
+                }
+            )
+            print(f"Deleted pending setup for {setup_id}")
+            return
+
+        # Fallback to old format for backward compatibility
         sessions_table.delete_item(
             Key={
                 'user_id': setup_id,
