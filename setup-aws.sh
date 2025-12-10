@@ -65,6 +65,14 @@ check_prerequisites() {
         exit 1
     fi
 
+    # Check for zip command or Python as fallback
+    if ! command -v zip &> /dev/null; then
+        log_warn "zip command not found. Will use Python's zipfile module as fallback."
+        USE_PYTHON_ZIP=true
+    else
+        USE_PYTHON_ZIP=false
+    fi
+
     # Check jq (optional but helpful)
     if ! command -v jq &> /dev/null; then
         log_warn "jq is not installed. JSON output will be less readable."
@@ -88,27 +96,43 @@ check_prerequisites() {
 prompt_user_input() {
     log_step "Gathering configuration..."
 
+    # Check for environment variables first, fallback to interactive prompts
     echo ""
     echo "Please provide the following information from your Discord application:"
     echo "https://discord.com/developers/applications"
     echo ""
+    log_info "Tip: You can set DISCORD_TOKEN, DISCORD_PUBLIC_KEY, DISCORD_APP_ID, and FROM_EMAIL"
+    log_info "     as environment variables to skip interactive prompts."
+    echo ""
 
     # Discord Bot Token
-    read -p "Discord Bot Token: " DISCORD_TOKEN
+    if [ -z "$DISCORD_TOKEN" ]; then
+        read -p "Discord Bot Token: " DISCORD_TOKEN
+    else
+        log_info "Using DISCORD_TOKEN from environment"
+    fi
     if [ -z "$DISCORD_TOKEN" ]; then
         log_error "Bot token is required"
         exit 1
     fi
 
     # Discord Public Key
-    read -p "Discord Public Key: " DISCORD_PUBLIC_KEY
+    if [ -z "$DISCORD_PUBLIC_KEY" ]; then
+        read -p "Discord Public Key: " DISCORD_PUBLIC_KEY
+    else
+        log_info "Using DISCORD_PUBLIC_KEY from environment"
+    fi
     if [ -z "$DISCORD_PUBLIC_KEY" ]; then
         log_error "Public key is required"
         exit 1
     fi
 
     # Discord App ID
-    read -p "Discord Application ID: " DISCORD_APP_ID
+    if [ -z "$DISCORD_APP_ID" ]; then
+        read -p "Discord Application ID: " DISCORD_APP_ID
+    else
+        log_info "Using DISCORD_APP_ID from environment"
+    fi
     if [ -z "$DISCORD_APP_ID" ]; then
         log_error "Application ID is required"
         exit 1
@@ -116,7 +140,11 @@ prompt_user_input() {
 
     # SES From Email
     echo ""
-    read -p "Email address to send verification codes from: " FROM_EMAIL
+    if [ -z "$FROM_EMAIL" ]; then
+        read -p "Email address to send verification codes from: " FROM_EMAIL
+    else
+        log_info "Using FROM_EMAIL from environment"
+    fi
     if [ -z "$FROM_EMAIL" ]; then
         log_error "From email is required"
         exit 1
@@ -209,34 +237,86 @@ create_dynamodb_tables() {
 setup_ses() {
     log_step "Setting up AWS SES..."
 
-    # Verify email identity
-    log_info "Verifying email identity: $FROM_EMAIL"
-    aws ses verify-email-identity --email-address "$FROM_EMAIL" --region $REGION 2>/dev/null || true
+    # Extract domain from email
+    EMAIL_DOMAIN="${FROM_EMAIL#*@}"
+    log_info "Email address: $FROM_EMAIL (domain: $EMAIL_DOMAIN)"
 
-    log_warn "⚠️  IMPORTANT: Check your email ($FROM_EMAIL) and click the verification link!"
-    log_warn "⚠️  The bot cannot send emails until the address is verified."
-    echo ""
-    read -p "Press Enter after you've verified the email address..."
+    # Check if account is in production mode (SESv2 API)
+    log_info "Checking SES account status..."
+    ACCOUNT_DETAILS=$(aws sesv2 get-account --region $REGION 2>/dev/null || echo '{}')
+    PRODUCTION_ACCESS=$(echo "$ACCOUNT_DETAILS" | grep -o '"ProductionAccessEnabled":[^,}]*' | cut -d: -f2 | tr -d ' ')
 
-    # Check verification status
-    VERIFICATION_STATUS=$(aws ses get-identity-verification-attributes \
-        --identities "$FROM_EMAIL" \
-        --region $REGION \
-        --query "VerificationAttributes.\"$FROM_EMAIL\".VerificationStatus" \
-        --output text)
-
-    if [ "$VERIFICATION_STATUS" = "Success" ]; then
-        log_info "✓ Email verified successfully!"
+    if [ "$PRODUCTION_ACCESS" = "true" ]; then
+        log_info "✓ SES account is in production mode"
+        IN_PRODUCTION=true
     else
-        log_warn "Email verification status: $VERIFICATION_STATUS"
-        log_warn "You may need to verify it before sending emails."
+        log_warn "SES account is in sandbox mode (can only send to verified addresses)"
+        log_warn "To send to any email address, request production access:"
+        log_warn "https://console.aws.amazon.com/ses/home?region=$REGION#/account"
+        IN_PRODUCTION=false
     fi
 
-    # Check if in sandbox mode
-    log_info "Checking SES account status..."
-    log_warn "Note: By default, SES is in sandbox mode (can only send to verified addresses)."
-    log_warn "To send to any email address, request production access in the AWS Console:"
-    log_warn "https://console.aws.amazon.com/ses/home?region=$REGION#/account"
+    # Check if domain is verified (SESv2 API)
+    DOMAIN_STATUS=$(aws sesv2 get-email-identity \
+        --email-identity "$EMAIL_DOMAIN" \
+        --region $REGION \
+        --query 'VerifiedForSendingStatus' \
+        --output text 2>/dev/null || echo "NOT_FOUND")
+
+    if [ "$DOMAIN_STATUS" = "true" ]; then
+        log_info "✓ Domain $EMAIL_DOMAIN is verified for sending"
+        DOMAIN_VERIFIED=true
+    else
+        log_warn "Domain $EMAIL_DOMAIN is not verified"
+        DOMAIN_VERIFIED=false
+    fi
+
+    # Determine if we need individual email verification
+    SKIP_EMAIL_VERIFICATION=false
+    if [ "$DOMAIN_VERIFIED" = "true" ] && [ "$IN_PRODUCTION" = "true" ]; then
+        log_info "✓ Domain verified + production mode = no individual email verification needed"
+        SKIP_EMAIL_VERIFICATION=true
+    elif [ "$DOMAIN_VERIFIED" = "true" ]; then
+        log_warn "Domain is verified but account is in sandbox mode"
+        log_warn "In sandbox, you can send FROM verified domains but only TO verified addresses"
+        SKIP_EMAIL_VERIFICATION=true
+    fi
+
+    # Only verify individual email if needed
+    if [ "$SKIP_EMAIL_VERIFICATION" = "false" ]; then
+        log_info "Starting email identity verification: $FROM_EMAIL"
+        aws ses verify-email-identity --email-address "$FROM_EMAIL" --region $REGION 2>/dev/null || true
+
+        log_warn "⚠️  IMPORTANT: Check your email ($FROM_EMAIL) and click the verification link!"
+        log_warn "⚠️  The bot cannot send emails until the address is verified."
+        echo ""
+
+        # Only prompt if running interactively (stdin is a terminal)
+        if [ -t 0 ]; then
+            read -p "Press Enter after you've verified the email address..."
+
+            # Check verification status
+            VERIFICATION_STATUS=$(aws ses get-identity-verification-attributes \
+                --identities "$FROM_EMAIL" \
+                --region $REGION \
+                --query "VerificationAttributes.\"$FROM_EMAIL\".VerificationStatus" \
+                --output text)
+
+            if [ "$VERIFICATION_STATUS" = "Success" ]; then
+                log_info "✓ Email verified successfully!"
+            else
+                log_warn "Email verification status: $VERIFICATION_STATUS"
+                log_warn "You may need to verify it before sending emails."
+            fi
+        else
+            log_warn "Non-interactive mode: Skipping email verification prompt"
+            log_warn "Make sure to verify $FROM_EMAIL before using the bot"
+        fi
+    else
+        log_info "✓ Skipping individual email verification (not needed)"
+    fi
+
+    log_info "✓ SES setup complete"
 }
 
 create_iam_role() {
@@ -374,27 +454,45 @@ create_lambda_layer() {
     LAYER_DIR=$(mktemp -d)
     mkdir -p "$LAYER_DIR/python"
 
-    log_info "Installing Python dependencies..."
-    pip install -r lambda-requirements.txt -t "$LAYER_DIR/python" --quiet
+    log_info "Installing Python dependencies from lambda-requirements.txt..."
+    # Use manylinux wheels to ensure Lambda compatibility (fixes GLIBC issues)
+    pip3 install \
+        --platform manylinux2014_x86_64 \
+        --target "$LAYER_DIR/python" \
+        --implementation cp \
+        --python-version 3.11 \
+        --only-binary=:all: \
+        --upgrade \
+        -r lambda-requirements.txt --quiet
 
-    # Create zip
+    # Create zip using either zip command or Python
     log_info "Creating layer package..."
-    cd "$LAYER_DIR"
-    zip -r9 layer.zip python > /dev/null
+    if [ "$USE_PYTHON_ZIP" = "true" ]; then
+        log_info "Using Python zipfile module..."
+        python3 <<EOF
+import shutil
+import os
+layer_dir = "$LAYER_DIR"
+shutil.make_archive(os.path.join(layer_dir, "layer"), 'zip', layer_dir, 'python')
+EOF
+    else
+        cd "$LAYER_DIR"
+        zip -r9 layer.zip python > /dev/null
+        cd - > /dev/null
+    fi
 
     # Upload layer
     log_info "Publishing layer to AWS..."
     LAYER_VERSION_ARN=$(aws lambda publish-layer-version \
         --layer-name $LAYER_NAME \
-        --description "Dependencies for Discord verification bot" \
-        --zip-file fileb://layer.zip \
+        --description "Dependencies for Discord verification bot (PyNaCl, requests)" \
+        --zip-file fileb://"$LAYER_DIR/layer.zip" \
         --compatible-runtimes python3.11 \
         --region $REGION \
         --query 'LayerVersionArn' \
         --output text)
 
     # Cleanup
-    cd - > /dev/null
     rm -rf "$LAYER_DIR"
 
     log_info "✓ Layer created: $LAYER_VERSION_ARN"
@@ -405,9 +503,19 @@ create_lambda_function() {
 
     # Create deployment package
     log_info "Creating deployment package..."
-    cd lambda
-    zip -r ../lambda-deployment.zip *.py > /dev/null
-    cd ..
+    if [ "$USE_PYTHON_ZIP" = "true" ]; then
+        log_info "Using Python zipfile module..."
+        python3 <<EOF
+import shutil
+import os
+# Create zip of lambda directory
+shutil.make_archive('lambda-deployment', 'zip', 'lambda')
+EOF
+    else
+        cd lambda
+        zip -r ../lambda-deployment.zip *.py > /dev/null
+        cd ..
+    fi
 
     # Check if function exists
     if aws lambda get-function --function-name $FUNCTION_NAME --region $REGION &> /dev/null; then
@@ -419,6 +527,8 @@ create_lambda_function() {
             --region $REGION > /dev/null
 
         log_info "Updating function configuration..."
+        # NOTE: AWS_REGION is intentionally NOT set here - it's a reserved environment variable
+        # Lambda code should use boto3's automatic region detection or fallback to 'us-east-1'
         aws lambda update-function-configuration \
             --function-name $FUNCTION_NAME \
             --environment "Variables={
@@ -427,14 +537,16 @@ create_lambda_function() {
                 DYNAMODB_GUILD_CONFIGS_TABLE=$CONFIGS_TABLE,
                 DISCORD_PUBLIC_KEY=$DISCORD_PUBLIC_KEY,
                 DISCORD_APP_ID=$DISCORD_APP_ID,
-                FROM_EMAIL=$FROM_EMAIL,
-                AWS_REGION=$REGION
+                FROM_EMAIL=$FROM_EMAIL
             }" \
             --region $REGION > /dev/null
 
         log_info "✓ Lambda function updated"
     else
         log_info "Creating new Lambda function..."
+        # NOTE: AWS_REGION is intentionally NOT set here - it's a reserved environment variable
+        # Lambda automatically provides AWS_REGION via the execution environment
+        # Lambda code uses boto3 which auto-detects the region
         FUNCTION_ARN=$(aws lambda create-function \
             --function-name $FUNCTION_NAME \
             --runtime python3.11 \
@@ -449,8 +561,7 @@ create_lambda_function() {
                 DYNAMODB_GUILD_CONFIGS_TABLE=$CONFIGS_TABLE,
                 DISCORD_PUBLIC_KEY=$DISCORD_PUBLIC_KEY,
                 DISCORD_APP_ID=$DISCORD_APP_ID,
-                FROM_EMAIL=$FROM_EMAIL,
-                AWS_REGION=$REGION
+                FROM_EMAIL=$FROM_EMAIL
             }" \
             --region $REGION \
             --query 'FunctionArn' \
@@ -556,7 +667,9 @@ DISCORD_PUBLIC_KEY=$DISCORD_PUBLIC_KEY
 # Email address to send verification codes from (must be verified in AWS SES)
 FROM_EMAIL=$FROM_EMAIL
 
-# AWS Region (should match where your resources are deployed)
+# AWS Region (used for local testing and slash command registration)
+# Note: Lambda functions automatically detect their region via boto3
+# This variable is for the register_slash_commands.py script
 AWS_REGION=$REGION
 EOF
 
