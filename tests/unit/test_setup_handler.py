@@ -494,7 +494,7 @@ def test_handle_domains_modal_submit_valid(mock_get_config, mock_store, mock_ext
     assert response['statusCode'] == 200
     body = json.loads(response['body'])
     assert body['type'] == InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE
-    assert 'Create Your Verification Message' in body['data']['content']
+    assert 'Customize Your Messages' in body['data']['content']
 
     # Check that the button exists
     components = body['data']['components']
@@ -736,7 +736,7 @@ def test_handle_message_modal_submit_valid_link(mock_param, mock_validate, mock_
 
     assert response['statusCode'] == 200
     body = json.loads(response['body'])
-    assert 'Preview Your Verification Message' in body['data']['content']
+    assert 'Configuration Preview' in body['data']['content']
     assert 'Click the button to verify!' in body['data']['content']
 
 
@@ -996,7 +996,8 @@ def test_handle_setup_approve_success(mock_delete, mock_post, mock_save, mock_ge
         '999888',  # channel_id
         '999888',  # user_id (from member)
         ['auburn.edu', 'custom.edu'],
-        'Verify your .edu email address!'
+        'Verify your .edu email address!',
+        None  # NEW: completion_message parameter (None since not set in sample_pending_setup)
     )
     mock_post.assert_called_once_with('123456', '999888', 'Verify your .edu email address!')
     mock_delete.assert_called_once_with('999888_123456', '123456')  # Now includes guild_id parameter

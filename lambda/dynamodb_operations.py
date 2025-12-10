@@ -221,7 +221,7 @@ def delete_session(user_id: str, guild_id: str):
         print(f"Error deleting session: {e}")
 
 
-def store_pending_setup(setup_id: str, user_id: str, guild_id: str, role_id: str, channel_id: str, allowed_domains: list, custom_message: str):
+def store_pending_setup(setup_id: str, user_id: str, guild_id: str, role_id: str, channel_id: str, allowed_domains: list, custom_message: str, completion_message: str = ""):
     """
     Store pending setup configuration temporarily (5 minute TTL).
 
@@ -233,6 +233,7 @@ def store_pending_setup(setup_id: str, user_id: str, guild_id: str, role_id: str
         channel_id: Discord channel ID
         allowed_domains: List of allowed email domains
         custom_message: Custom verification message
+        completion_message: Custom completion message (optional)
     """
     try:
         from datetime import datetime, timedelta
@@ -250,11 +251,12 @@ def store_pending_setup(setup_id: str, user_id: str, guild_id: str, role_id: str
                 'channel_id': channel_id,
                 'allowed_domains': allowed_domains,
                 'custom_message': custom_message,
+                'completion_message': completion_message,
                 'ttl': ttl,
                 'created_at': datetime.utcnow().isoformat()
             }
         )
-        print(f"Stored pending setup for {setup_id}")
+        print(f"Stored pending setup for {setup_id} with completion_message (length: {len(completion_message)})")
     except Exception as e:
         print(f"Error storing pending setup: {e}")
 

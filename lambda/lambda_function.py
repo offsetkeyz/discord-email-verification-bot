@@ -18,9 +18,11 @@ from setup_handler import (
     handle_setup_select_menu,
     handle_setup_continue,
     handle_domains_modal_submit,
+    handle_completion_message_button,
     handle_message_link_button,
     handle_skip_message_button,
     handle_message_modal_submit,
+    handle_completion_message_modal_submit,
     handle_setup_approve,
     handle_setup_cancel
 )
@@ -105,6 +107,8 @@ def lambda_handler(event, context):
                 return handle_setup_select_menu(body)
             elif custom_id == 'setup_continue':
                 return handle_setup_continue(body)
+            elif custom_id.startswith('setup_completion_message_'):
+                return handle_completion_message_button(body)
             elif custom_id.startswith('setup_message_link_'):
                 return handle_message_link_button(body)
             elif custom_id.startswith('setup_skip_message_'):
@@ -125,6 +129,8 @@ def lambda_handler(event, context):
                 return handle_domains_modal_submit(body)
             elif custom_id.startswith('setup_link_modal_'):
                 return handle_message_modal_submit(body)
+            elif custom_id.startswith('completion_message_modal_'):
+                return handle_completion_message_modal_submit(body)
             else:
                 return handle_modal_submit(body)
 

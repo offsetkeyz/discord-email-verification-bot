@@ -390,6 +390,12 @@ def handle_domains_modal_submit(interaction: dict) -> dict:
             'style': ButtonStyle.PRIMARY,
             'label': '📝 Submit Message Link',
             'custom_id': f'setup_message_link_{setup_id}'
+        },
+        {
+            'type': ComponentType.BUTTON,
+            'style': ButtonStyle.SECONDARY,
+            'label': '✏️ Customize Completion Message',
+            'custom_id': f'setup_completion_message_{setup_id}'
         }
     ]
 
@@ -398,23 +404,26 @@ def handle_domains_modal_submit(interaction: dict) -> dict:
         buttons.append({
             'type': ComponentType.BUTTON,
             'style': ButtonStyle.SECONDARY,
-            'label': 'Skip (Keep Current Message)',
+            'label': 'Skip (Use Defaults)',
             'custom_id': f'setup_skip_message_{setup_id}'
         })
 
     # Show instructions with button to enter message link
     instructions = (
-        "## ✍️ Create Your Verification Message\n\n"
-        "**Step 1:** Type your verification message in any Discord channel (don't send it yet)\n"
-        "• Use Discord's emoji picker for emojis\n"
-        "• Use **bold**, *italic*, and other formatting\n\n"
-        "**Step 2:** Send the message\n\n"
-        "**Step 3:** Right-click (or long-press on mobile) your message → **Copy Message Link**\n\n"
-        "**Step 4:** Click the button below and paste the link"
+        "## ✍️ Customize Your Messages\n\n"
+        "You can customize two types of messages:\n\n"
+        "**1. Verification Trigger Message** (shown in the channel)\n"
+        "• Click '📝 Submit Message Link' to set a custom trigger message\n"
+        "• Users will see this with a 'Start Verification' button\n\n"
+        "**2. Completion Message** (shown after successful verification)\n"
+        "• Click '✏️ Customize Completion Message' to set what users see after verifying\n"
+        "• Default: \"🎉 Verification complete! You now have access to the server. Welcome! 👋\"\n\n"
     )
 
     if has_existing_message:
-        instructions += "\n\n*Or click 'Skip' to keep your current verification message.*"
+        instructions += "*Or click 'Skip (Use Defaults)' to keep your current messages.*"
+    else:
+        instructions += "*Both messages are optional. You can customize one, both, or neither.*"
 
     return {
         'statusCode': 200,
@@ -523,6 +532,55 @@ def handle_skip_message_button(interaction: dict) -> dict:
                                 'style': ButtonStyle.DANGER,
                                 'label': '❌ Cancel',
                                 'custom_id': 'setup_cancel'
+                            }
+                        ]
+                    }
+                ]
+            }
+        })
+    }
+
+
+def handle_completion_message_button(interaction: dict) -> dict:
+    """
+    Show modal for completion message customization.
+
+    Args:
+        interaction: Discord interaction payload
+
+    Returns:
+        Lambda response dict
+    """
+    custom_id = interaction['data']['custom_id']
+    # Format: setup_completion_message_{setup_id} (with security validation)
+    setup_id = extract_setup_id_from_custom_id(custom_id, 'setup_completion_message')
+
+    if not setup_id:
+        return ephemeral_response("❌ Invalid state. Please run /setup again.")
+
+    # Show modal for completion message customization
+    from guild_config import DEFAULT_COMPLETION_MESSAGE
+
+    return {
+        'statusCode': 200,
+        'headers': {'Content-Type': 'application/json'},
+        'body': json.dumps({
+            'type': InteractionResponseType.MODAL,
+            'data': {
+                'custom_id': f'completion_message_modal_{setup_id}',
+                'title': '📝 Customize Completion Message',
+                'components': [
+                    {
+                        'type': ComponentType.ACTION_ROW,
+                        'components': [
+                            {
+                                'type': ComponentType.TEXT_INPUT,
+                                'custom_id': 'completion_message',
+                                'label': 'Completion Message',
+                                'style': 2,  # PARAGRAPH (multiline)
+                                'placeholder': DEFAULT_COMPLETION_MESSAGE,
+                                'required': False,
+                                'max_length': 2000
                             }
                         ]
                     }
@@ -684,7 +742,13 @@ def handle_message_modal_submit(interaction: dict) -> dict:
         custom_message=custom_message
     )
 
-    # Show preview with approve/cancel buttons
+    # Get completion message from pending setup (may have been set earlier)
+    completion_message = config.get('completion_message', '')
+    if not completion_message:
+        from guild_config import DEFAULT_COMPLETION_MESSAGE
+        completion_message = DEFAULT_COMPLETION_MESSAGE
+
+    # Show preview with approve/cancel buttons including completion message
     return {
         'statusCode': 200,
         'headers': {'Content-Type': 'application/json'},
@@ -692,16 +756,141 @@ def handle_message_modal_submit(interaction: dict) -> dict:
             'type': InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             'data': {
                 'content': (
-                    f"## 👀 Preview Your Verification Message\n\n"
-                    f"**Configuration:**\n"
+                    f"## 📋 Configuration Preview\n\n"
+                    f"**Settings:**\n"
                     f"• Role: <@&{role_id}>\n"
                     f"• Channel: <#{channel_id}>\n"
                     f"• Allowed Domains: {', '.join(allowed_domains)}\n\n"
-                    f"**Message Preview:**\n"
+                    f"**Verification Trigger Message:**\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"{custom_message}\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                    f"This is how the message will appear in <#{channel_id}>."
+                    f"**Completion Message:**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"{completion_message}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"Ready to activate? Click 'Approve & Post' to save this configuration."
+                ),
+                'flags': MessageFlags.EPHEMERAL,
+                'components': [
+                    {
+                        'type': ComponentType.ACTION_ROW,
+                        'components': [
+                            {
+                                'type': ComponentType.BUTTON,
+                                'style': ButtonStyle.SUCCESS,
+                                'label': '✅ Approve & Post',
+                                'custom_id': f'setup_approve_{setup_id}'
+                            },
+                            {
+                                'type': ComponentType.BUTTON,
+                                'style': ButtonStyle.DANGER,
+                                'label': '❌ Cancel',
+                                'custom_id': 'setup_cancel'
+                            }
+                        ]
+                    }
+                ]
+            }
+        })
+    }
+
+
+def handle_completion_message_modal_submit(interaction: dict) -> dict:
+    """
+    Handle completion message modal submission.
+
+    Args:
+        interaction: Discord interaction payload
+
+    Returns:
+        Lambda response dict
+    """
+    from dynamodb_operations import get_pending_setup, store_pending_setup
+    from guild_config import DEFAULT_COMPLETION_MESSAGE
+
+    member = interaction.get('member', {})
+    guild_id = interaction.get('guild_id')
+    user_id = member.get('user', {}).get('id')
+
+    # Extract setup_id from custom_id (with security validation)
+    custom_id = interaction['data']['custom_id']
+    setup_id = extract_setup_id_from_custom_id(custom_id, 'completion_message_modal')
+
+    if not setup_id:
+        return ephemeral_response("❌ Invalid state. Please run /setup again.")
+
+    # Get pending setup config
+    config = get_pending_setup(setup_id, guild_id)
+    if not config:
+        return ephemeral_response("❌ Setup session expired. Please run /setup again.")
+
+    # Extract completion message from modal
+    components = interaction['data']['components']
+    completion_message = components[0]['components'][0].get('value', '').strip()
+
+    # Use default if empty
+    if not completion_message:
+        completion_message = DEFAULT_COMPLETION_MESSAGE
+
+    # Validate and sanitize
+    # Remove @everyone/@here mentions for security
+    completion_message = completion_message.replace('@everyone', '@\u200beveryone')
+    completion_message = completion_message.replace('@here', '@\u200bhere')
+
+    # Enforce 2000 character limit
+    if len(completion_message) > 2000:
+        completion_message = completion_message[:2000]
+        print(f"Warning: Completion message truncated to 2000 chars for guild {guild_id}")
+
+    # Update pending setup with completion message
+    store_pending_setup(
+        setup_id=setup_id,
+        user_id=config['admin_user_id'],
+        guild_id=guild_id,
+        role_id=config['role_id'],
+        channel_id=config['channel_id'],
+        allowed_domains=config['allowed_domains'],
+        custom_message=config.get('custom_message', ''),
+        completion_message=completion_message
+    )
+
+    # Show preview with both messages
+    role_id = config['role_id']
+    channel_id = config['channel_id']
+    allowed_domains = config['allowed_domains']
+    custom_message = config.get('custom_message', '')
+
+    # Get the custom message or use default if not set
+    if not custom_message:
+        from guild_config import get_guild_config
+        existing_config = get_guild_config(guild_id)
+        if existing_config and existing_config.get('custom_message'):
+            custom_message = existing_config['custom_message']
+        else:
+            custom_message = "Click the button below to verify your email address."
+
+    return {
+        'statusCode': 200,
+        'headers': {'Content-Type': 'application/json'},
+        'body': json.dumps({
+            'type': InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            'data': {
+                'content': (
+                    f"## 📋 Configuration Preview\n\n"
+                    f"**Settings:**\n"
+                    f"• Role: <@&{role_id}>\n"
+                    f"• Channel: <#{channel_id}>\n"
+                    f"• Allowed Domains: {', '.join(allowed_domains)}\n\n"
+                    f"**Verification Trigger Message:**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"{custom_message}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"**Completion Message:**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"{completion_message}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"Ready to activate? Click 'Approve & Post' to save this configuration."
                 ),
                 'flags': MessageFlags.EPHEMERAL,
                 'components': [
@@ -761,13 +950,14 @@ def handle_setup_approve(interaction: dict) -> dict:
         channel_id = config_data['channel_id']
         allowed_domains = config_data['allowed_domains']
         custom_message = config_data['custom_message']
+        completion_message = config_data.get('completion_message', None)
 
     except KeyError as e:
         print(f"Error retrieving config: {e}")
         return ephemeral_response("❌ Invalid configuration data. Please run /setup again.")
 
-    # Save configuration
-    success = save_guild_config(guild_id, role_id, channel_id, user_id, allowed_domains, custom_message)
+    # Save configuration with completion message
+    success = save_guild_config(guild_id, role_id, channel_id, user_id, allowed_domains, custom_message, completion_message)
 
     if not success:
         return ephemeral_response(
