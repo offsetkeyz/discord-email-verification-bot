@@ -2,11 +2,12 @@
 AWS Systems Manager Parameter Store utilities.
 Loads configuration and secrets from SSM.
 """
+import os
 import boto3
 from functools import lru_cache
 
 
-ssm_client = boto3.client('ssm', region_name='us-east-1')
+ssm_client = boto3.client('ssm', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
 
 
 @lru_cache(maxsize=32)

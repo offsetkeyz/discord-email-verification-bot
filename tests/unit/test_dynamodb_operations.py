@@ -584,27 +584,33 @@ class TestPendingSetup:
     def test_store_pending_setup(self, mock_dynamodb_tables):
         """Test storing pending setup configuration."""
         store_pending_setup(
-            setup_id='user123_guild456',
+            setup_id='test-uuid-123',
+            user_id='user123',
+            guild_id='guild456',
             role_id='role123',
             channel_id='channel456',
             allowed_domains=['test.edu'],
             custom_message='Test message'
         )
 
-        # Verify storage
+        # Verify storage with new format
         response = mock_dynamodb_tables['sessions'].get_item(
-            Key={'user_id': 'user123_guild456', 'guild_id': 'PENDING_SETUP'}
+            Key={'user_id': 'setup_test-uuid-123', 'guild_id': 'guild456'}
         )
 
         assert 'Item' in response
         assert response['Item']['role_id'] == 'role123'
         assert response['Item']['channel_id'] == 'channel456'
+        assert response['Item']['setup_id'] == 'test-uuid-123'
+        assert response['Item']['admin_user_id'] == 'user123'
 
     @freeze_time("2025-01-15 10:30:00")
     def test_store_pending_setup_sets_ttl(self, mock_dynamodb_tables):
         """Test that pending setup has 5-minute TTL."""
         store_pending_setup(
-            setup_id='user123_guild456',
+            setup_id='test-uuid-123',
+            user_id='user123',
+            guild_id='guild456',
             role_id='role123',
             channel_id='channel456',
             allowed_domains=['test.edu'],
@@ -612,7 +618,7 @@ class TestPendingSetup:
         )
 
         response = mock_dynamodb_tables['sessions'].get_item(
-            Key={'user_id': 'user123_guild456', 'guild_id': 'PENDING_SETUP'}
+            Key={'user_id': 'setup_test-uuid-123', 'guild_id': 'guild456'}
         )
 
         expected_ttl = int((datetime.utcnow() + timedelta(minutes=5)).timestamp())

@@ -4,6 +4,7 @@ Allows server admins to configure the bot via /setup command with select menus.
 """
 import json
 import requests
+import uuid
 from discord_interactions import (
     InteractionResponseType,
     MessageFlags,
@@ -365,9 +366,12 @@ def handle_domains_modal_submit(interaction: dict) -> dict:
     # Store domains temporarily
     from dynamodb_operations import store_pending_setup
 
-    setup_id = f"{user_id}_{guild_id}"
+    # Generate a unique UUID for this setup session
+    setup_id = str(uuid.uuid4())
     store_pending_setup(
         setup_id=setup_id,
+        user_id=user_id,
+        guild_id=guild_id,
         role_id=role_id,
         channel_id=channel_id,
         allowed_domains=allowed_domains,
@@ -456,7 +460,7 @@ def handle_skip_message_button(interaction: dict) -> dict:
         return ephemeral_response("❌ Invalid state. Please run /setup again.")
 
     # Get pending setup config
-    pending_config = get_pending_setup(setup_id)
+    pending_config = get_pending_setup(setup_id, guild_id)
     if not pending_config:
         return ephemeral_response("❌ Setup session expired. Please run /setup again.")
 
@@ -476,6 +480,8 @@ def handle_skip_message_button(interaction: dict) -> dict:
     from dynamodb_operations import store_pending_setup
     store_pending_setup(
         setup_id=setup_id,
+        user_id=user_id,
+        guild_id=guild_id,
         role_id=role_id,
         channel_id=channel_id,
         allowed_domains=allowed_domains,
@@ -600,7 +606,7 @@ def handle_message_modal_submit(interaction: dict) -> dict:
         return ephemeral_response("❌ Invalid setup state. Please run /setup again.")
 
     # Get pending setup config
-    config = get_pending_setup(setup_id)
+    config = get_pending_setup(setup_id, guild_id)
     if not config:
         return ephemeral_response("❌ Setup session expired. Please run /setup again.")
 
@@ -664,12 +670,14 @@ def handle_message_modal_submit(interaction: dict) -> dict:
         print(f"Error fetching message: {e}")
         return ephemeral_response(f"❌ Error fetching message: {str(e)}")
 
-    # Store config temporarily
+    # Store config temporarily (update existing pending setup with message)
     from dynamodb_operations import store_pending_setup
 
-    setup_id = f"{user_id}_{guild_id}"
+    # Reuse the setup_id from the modal custom_id
     store_pending_setup(
         setup_id=setup_id,
+        user_id=user_id,
+        guild_id=guild_id,
         role_id=role_id,
         channel_id=channel_id,
         allowed_domains=allowed_domains,
@@ -744,7 +752,7 @@ def handle_setup_approve(interaction: dict) -> dict:
         return ephemeral_response("❌ Invalid approval state. Please run /setup again.")
 
     # Retrieve pending setup from DynamoDB
-    config_data = get_pending_setup(setup_id)
+    config_data = get_pending_setup(setup_id, guild_id)
     if not config_data:
         return ephemeral_response("❌ Setup session expired. Please run /setup again.")
 
@@ -770,7 +778,7 @@ def handle_setup_approve(interaction: dict) -> dict:
     posted = post_verification_message(guild_id, channel_id, custom_message)
 
     # Clean up pending setup
-    delete_pending_setup(setup_id)
+    delete_pending_setup(setup_id, guild_id)
 
     if not posted:
         return ephemeral_response(

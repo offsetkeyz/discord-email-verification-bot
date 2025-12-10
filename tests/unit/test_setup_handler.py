@@ -587,10 +587,15 @@ def test_handle_domains_modal_submit_stores_pending_setup(mock_get_config, mock_
 
     response = handle_domains_modal_submit(sample_interaction)
 
-    # Verify store_pending_setup was called with correct setup_id
+    # Verify store_pending_setup was called with UUID format setup_id
     mock_store.assert_called_once()
     call_args = mock_store.call_args[1]
-    assert call_args['setup_id'] == '999888_123456'
+    # Check that setup_id is a valid UUID format (not old user_id_guild_id format)
+    import re
+    uuid_pattern = r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
+    assert re.match(uuid_pattern, call_args['setup_id']), f"setup_id should be UUID format, got: {call_args['setup_id']}"
+    assert call_args['user_id'] == '999888'
+    assert call_args['guild_id'] == '123456'
     assert call_args['custom_message'] == ''  # Will be filled from message link
 
 
@@ -994,7 +999,7 @@ def test_handle_setup_approve_success(mock_delete, mock_post, mock_save, mock_ge
         'Verify your .edu email address!'
     )
     mock_post.assert_called_once_with('123456', '999888', 'Verify your .edu email address!')
-    mock_delete.assert_called_once_with('999888_123456')
+    mock_delete.assert_called_once_with('999888_123456', '123456')  # Now includes guild_id parameter
 
 
 @pytest.mark.unit

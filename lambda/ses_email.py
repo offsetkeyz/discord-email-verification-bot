@@ -10,8 +10,8 @@ from ses_suppression_list import is_suppressed
 
 
 # Initialize SES client
-ses_client = boto3.client('ses', region_name='us-east-1')
-cloudwatch = boto3.client('cloudwatch', region_name='us-east-1')
+ses_client = boto3.client('ses', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+cloudwatch = boto3.client('cloudwatch', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
 
 
 def publish_email_metric(metric_name: str, value: float = 1.0):
