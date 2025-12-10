@@ -1,0 +1,28 @@
+Hello,
+
+Thank you for submitting your request to increase your sending limits. Your new sending quota is 50,000 messages per day. Your maximum send rate is now 14 messages per second. We have also moved your account out of the Amazon SES sandbox.
+
+This takes effect immediately in the US East (N. Virginia) region. You can view the current sending rate and sending quota for your account on the Sending Statistics page of the Amazon SES console, or by using the GetSendQuota API.
+
+As you get started with Amazon SES, keep in mind that you must:
+
+- Comply with the AWS Acceptable Use Policy ( http://aws.amazon.com/aup/  ) and read the Amazon SES Service Terms (section Amazon Simple Email Service (SES) of http://aws.amazon.com/service-terms/  ).
+
+- Send only high-quality emails to recipients who expect to hear from you. For more information, see https://docs.aws.amazon.com/ses/latest/dg/best-practices.html .
+
+- Set up a process to handle bounces and complaints. For more information, see https://docs.aws.amazon.com/ses/latest/dg/monitor-sending-activity.html .
+
+- Use your new account to send a different type of email than you are sending from your other account(s), if applicable. For more information, see http://docs.aws.amazon.com/ses/latest/DeveloperGuide/multiple-accounts.html .
+
+- Use the Amazon SES mailbox simulator to test your system so that your testing does not adversely impact your account. For more information, see https://docs.aws.amazon.com/ses/latest/dg/send-an-email-from-console.html .
+
+- Apply for higher sending limits before you need them. For more information, see https://docs.aws.amazon.com/ses/latest/dg/manage-sending-quotas-request-increase.html .
+
+- With Amazon SES, you pay only for what you use. There are no contract negotiations and no minimum charges. For more information see: https://aws.amazon.com/ses/pricing/ 
+
+Thank you for using Amazon Web Services.
+
+We value your feedback. Please share your experience by rating this and other correspondences in the AWS Support Center. You can rate a correspondence by selecting the stars in the top right corner of the correspondence.
+
+Best regards,
+Trust and Safety

@@ -6,10 +6,27 @@ import boto3
 import os
 from botocore.exceptions import ClientError
 from logging_utils import log_email_event
+from ses_suppression_list import is_suppressed
 
 
 # Initialize SES client
 ses_client = boto3.client('ses', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+cloudwatch = boto3.client('cloudwatch', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+
+
+def publish_email_metric(metric_name: str, value: float = 1.0):
+    """Publish custom CloudWatch metric."""
+    try:
+        cloudwatch.put_metric_data(
+            Namespace='DiscordBot/SES',
+            MetricData=[{
+                'MetricName': metric_name,
+                'Value': value,
+                'Unit': 'Count'
+            }]
+        )
+    except Exception as e:
+        print(f"ERROR publishing metric {metric_name}: {e}")
 
 
 def send_verification_email(email: str, code: str) -> bool:
@@ -23,6 +40,13 @@ def send_verification_email(email: str, code: str) -> bool:
     Returns:
         True if email sent successfully, False otherwise
     """
+    # CHECK SUPPRESSION LIST FIRST
+    if is_suppressed(email):
+        print(f"Email {email} is on suppression list - not sending")
+        publish_email_metric('EmailsSuppressed')
+        log_email_event("suppressed", email, False, "Email on bounce/complaint suppression list")
+        return False
+
     from_email = os.environ.get('FROM_EMAIL', 'verificationcode.noreply@thedailydecrypt.com')
 
     subject = 'Discord Verification Code'
@@ -85,12 +109,15 @@ If you did not request this verification, please ignore this email.
 
         message_id = response['MessageId']
         log_email_event("sent", email, True, f"MessageId: {message_id}")
+        publish_email_metric('EmailsSent')
         return True
 
     except ClientError as e:
         error_message = e.response['Error']['Message']
         log_email_event("sent", email, False, f"SES Error: {error_message}")
+        publish_email_metric('EmailsFailed')
         return False
     except Exception as e:
         print(f"Unexpected error sending email: {e}")
+        publish_email_metric('EmailsFailed')
         return False
