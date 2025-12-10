@@ -28,7 +28,7 @@ from verification_logic import (
 )
 from discord_api import assign_role, user_has_role
 from ssm_utils import get_parameter
-from guild_config import get_guild_config, get_guild_role_id, get_guild_allowed_domains, is_guild_configured
+from guild_config import get_guild_config, get_guild_role_id, get_guild_allowed_domains, is_guild_configured, get_guild_completion_message
 
 
 def handle_ping() -> dict:
@@ -375,10 +375,9 @@ def handle_code_verification(interaction: dict, user_id: str, guild_id: str) -> 
     success = assign_role(user_id, guild_id, role_id, bot_token)
 
     if success:
-        return ephemeral_response(
-            "🎉 **Verification complete!** You now have access to the server.\n\n"
-            "Welcome! 👋"
-        )
+        # Get custom completion message from guild config
+        completion_message = get_guild_completion_message(guild_id)
+        return ephemeral_response(completion_message)
     else:
         return ephemeral_response(
             "✅ Verification successful, but I encountered an issue assigning your role.\n\n"

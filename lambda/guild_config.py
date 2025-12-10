@@ -13,6 +13,10 @@ dynamodb = boto3.resource('dynamodb')
 configs_table = dynamodb.Table(os.environ.get('DYNAMODB_GUILD_CONFIGS_TABLE', 'discord-guild-configs'))
 
 
+# Default completion message shown after successful verification
+DEFAULT_COMPLETION_MESSAGE = "🎉 **Verification complete!** You now have access to the server.\n\nWelcome! 👋"
+
+
 def get_guild_config(guild_id: str) -> Optional[Dict[str, Any]]:
     """
     Get configuration for a specific guild.
@@ -44,7 +48,8 @@ def save_guild_config(
     channel_id: str,
     setup_by_user_id: str,
     allowed_domains: Optional[list] = None,
-    custom_message: Optional[str] = None
+    custom_message: Optional[str] = None,
+    completion_message: Optional[str] = None
 ) -> bool:
     """
     Save or update guild configuration.
@@ -56,6 +61,7 @@ def save_guild_config(
         setup_by_user_id: User ID who ran setup
         allowed_domains: Optional list of allowed email domains (defaults to auburn.edu, student.sans.edu)
         custom_message: Optional custom verification message
+        completion_message: Optional custom completion message (shown after successful verification)
 
     Returns:
         True if saved successfully, False otherwise
@@ -69,19 +75,37 @@ def save_guild_config(
         if custom_message is None:
             custom_message = "Click the button below to verify your email address."
 
+        if completion_message is None:
+            completion_message = DEFAULT_COMPLETION_MESSAGE
+
+        # Validate and sanitize completion_message
+        if completion_message:
+            # Strip whitespace
+            completion_message = completion_message.strip()
+
+            # Remove @everyone and @here mentions for security
+            completion_message = completion_message.replace('@everyone', '@\u200beveryone')
+            completion_message = completion_message.replace('@here', '@\u200bhere')
+
+            # Enforce Discord's 2000 character limit
+            if len(completion_message) > 2000:
+                completion_message = completion_message[:2000]
+                print(f"Warning: Completion message truncated to 2000 chars for guild {guild_id}")
+
         config_item = {
             'guild_id': guild_id,
             'role_id': role_id,
             'channel_id': channel_id,
             'allowed_domains': allowed_domains,
             'custom_message': custom_message,
+            'completion_message': completion_message,
             'setup_by': setup_by_user_id,
             'setup_timestamp': now.isoformat(),
             'last_updated': now.isoformat()
         }
 
         configs_table.put_item(Item=config_item)
-        print(f"Saved config for guild {guild_id}: role={role_id}, channel={channel_id}")
+        print(f"Saved config for guild {guild_id}: role={role_id}, channel={channel_id}, completion_msg_len={len(completion_message)}")
         return True
 
     except Exception as e:
@@ -151,6 +175,48 @@ def get_guild_custom_message(guild_id: str) -> str:
 
     # Default message if not configured
     return "Click the button below to verify your email address."
+
+
+def get_guild_completion_message(guild_id: str) -> str:
+    """
+    Get custom completion message for guild, or return default.
+
+    Args:
+        guild_id: Discord guild ID
+
+    Returns:
+        str: Custom completion message or default message
+
+    Notes:
+        - Returns default message if guild not found
+        - Returns default message if field missing (backward compatibility)
+        - Returns default message if field is empty string or whitespace only
+        - Handles DynamoDB errors gracefully by returning default
+    """
+    try:
+        # Get guild config
+        config = get_guild_config(guild_id)
+
+        # Check if config exists
+        if not config:
+            print(f"No config found for guild {guild_id}, using default completion message")
+            return DEFAULT_COMPLETION_MESSAGE
+
+        # Extract completion_message field
+        completion_message = config.get('completion_message', '').strip()
+
+        # Return custom message if present and non-empty
+        if completion_message:
+            print(f"Using custom completion message for guild {guild_id} (length: {len(completion_message)})")
+            return completion_message
+        else:
+            print(f"Completion message empty for guild {guild_id}, using default")
+            return DEFAULT_COMPLETION_MESSAGE
+
+    except Exception as e:
+        print(f"Error getting completion message for guild {guild_id}: {e}")
+        # Fail safe: return default message
+        return DEFAULT_COMPLETION_MESSAGE
 
 
 def delete_guild_config(guild_id: str) -> bool:
