@@ -485,6 +485,12 @@ def handle_skip_message_button(interaction: dict) -> dict:
     allowed_domains = pending_config['allowed_domains']
     custom_message = existing_config['custom_message']
 
+    # Get completion message from pending setup or use default
+    completion_message = pending_config.get('completion_message', '')
+    if not completion_message:
+        from guild_config import DEFAULT_COMPLETION_MESSAGE
+        completion_message = DEFAULT_COMPLETION_MESSAGE
+
     # Update pending setup with existing message
     from dynamodb_operations import store_pending_setup
     store_pending_setup(
@@ -494,7 +500,8 @@ def handle_skip_message_button(interaction: dict) -> dict:
         role_id=role_id,
         channel_id=channel_id,
         allowed_domains=allowed_domains,
-        custom_message=custom_message
+        custom_message=custom_message,
+        completion_message=completion_message
     )
 
     # Show preview with approve/cancel buttons
@@ -505,19 +512,40 @@ def handle_skip_message_button(interaction: dict) -> dict:
             'type': InteractionResponseType.UPDATE_MESSAGE,
             'data': {
                 'content': (
-                    f"## 👀 Preview Your Verification Message\n\n"
-                    f"**Configuration:**\n"
+                    f"## 📋 Configuration Preview\n\n"
+                    f"**Settings:**\n"
                     f"• Role: <@&{role_id}>\n"
                     f"• Channel: <#{channel_id}>\n"
                     f"• Allowed Domains: {', '.join(allowed_domains)}\n\n"
-                    f"**Message Preview:**\n"
+                    f"**Verification Trigger Message:**\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"{custom_message}\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                    f"This is how the message will appear in <#{channel_id}>."
+                    f"**Completion Message:**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"{completion_message}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"Ready to activate? Click 'Approve & Post' to save this configuration."
                 ),
                 'flags': MessageFlags.EPHEMERAL,
                 'components': [
+                    {
+                        'type': ComponentType.ACTION_ROW,
+                        'components': [
+                            {
+                                'type': ComponentType.BUTTON,
+                                'style': ButtonStyle.PRIMARY,
+                                'label': '📝 Edit Message Link',
+                                'custom_id': f'setup_message_link_{setup_id}'
+                            },
+                            {
+                                'type': ComponentType.BUTTON,
+                                'style': ButtonStyle.SECONDARY,
+                                'label': '✏️ Edit Completion Message',
+                                'custom_id': f'setup_completion_message_{setup_id}'
+                            }
+                        ]
+                    },
                     {
                         'type': ComponentType.ACTION_ROW,
                         'components': [
@@ -778,6 +806,23 @@ def handle_message_modal_submit(interaction: dict) -> dict:
                         'components': [
                             {
                                 'type': ComponentType.BUTTON,
+                                'style': ButtonStyle.PRIMARY,
+                                'label': '📝 Edit Message Link',
+                                'custom_id': f'setup_message_link_{setup_id}'
+                            },
+                            {
+                                'type': ComponentType.BUTTON,
+                                'style': ButtonStyle.SECONDARY,
+                                'label': '✏️ Edit Completion Message',
+                                'custom_id': f'setup_completion_message_{setup_id}'
+                            }
+                        ]
+                    },
+                    {
+                        'type': ComponentType.ACTION_ROW,
+                        'components': [
+                            {
+                                'type': ComponentType.BUTTON,
                                 'style': ButtonStyle.SUCCESS,
                                 'label': '✅ Approve & Post',
                                 'custom_id': f'setup_approve_{setup_id}'
@@ -894,6 +939,23 @@ def handle_completion_message_modal_submit(interaction: dict) -> dict:
                 ),
                 'flags': MessageFlags.EPHEMERAL,
                 'components': [
+                    {
+                        'type': ComponentType.ACTION_ROW,
+                        'components': [
+                            {
+                                'type': ComponentType.BUTTON,
+                                'style': ButtonStyle.PRIMARY,
+                                'label': '📝 Edit Message Link',
+                                'custom_id': f'setup_message_link_{setup_id}'
+                            },
+                            {
+                                'type': ComponentType.BUTTON,
+                                'style': ButtonStyle.SECONDARY,
+                                'label': '✏️ Edit Completion Message',
+                                'custom_id': f'setup_completion_message_{setup_id}'
+                            }
+                        ]
+                    },
                     {
                         'type': ComponentType.ACTION_ROW,
                         'components': [

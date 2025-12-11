@@ -96,12 +96,6 @@ def handle_start_verification(user_id: str, guild_id: str) -> dict:
             "✅ You already have the verified role! No need to verify again."
         )
 
-    # Check if already verified in database
-    if is_user_verified(user_id, guild_id):
-        return ephemeral_response(
-            "✅ You are already verified in this server! No need to verify again."
-        )
-
     # Check rate limiting (prevents spam/DDOS)
     is_allowed, seconds_remaining = check_rate_limit(user_id, guild_id, cooldown_seconds=60)
     if not is_allowed:
