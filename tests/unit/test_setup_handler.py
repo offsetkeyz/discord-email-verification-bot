@@ -658,8 +658,9 @@ def test_handle_skip_message_button_uses_existing(mock_store, mock_get_config, m
     assert response['statusCode'] == 200
     body = json.loads(response['body'])
     assert body['type'] == InteractionResponseType.UPDATE_MESSAGE
-    assert 'Preview Your Verification Message' in body['data']['content']
+    assert 'Configuration Preview' in body['data']['content']
     assert 'Click to verify your email!' in body['data']['content']
+    assert 'Completion Message' in body['data']['content']
 
     # Verify pending setup was updated with existing message
     mock_store.assert_called_once()
