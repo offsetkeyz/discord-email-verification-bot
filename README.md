@@ -11,8 +11,8 @@ A serverless Discord bot for email verification using AWS Lambda, DynamoDB, and 
 aws configure
 
 # Clone and run setup
-git clone https://github.com/offsetkeyz/discord-email-verification-bot.git
-cd discord-email-verification-bot
+git clone https://github.com/offsetkeyz/au-discord-bot.git
+cd au-discord-bot
 ./setup-aws.sh
 ```
 
@@ -29,13 +29,15 @@ See [Setup](#setup) for detailed instructions.
 - **Multi-Guild Support** - Each Discord server can configure their own:
   - Allowed email domains
   - Verified role
-  - Custom verification message with emoji support
+  - Custom verification trigger message with emoji support
+  - Custom completion message shown after successful verification
 - **Email Verification** - 6-digit codes sent via AWS SES
 - **Security Features**:
   - Request signature verification
   - Rate limiting (60-second cooldown between attempts)
   - Code expiration (15 minutes)
   - Maximum 3 verification attempts per code
+  - Role-based verification check (prevents duplicate verifications)
 - **Admin Setup Flow** - Interactive `/setup-email-verification` command for server configuration
 - **Persistent Storage** - DynamoDB for session and verification tracking
 
@@ -63,12 +65,19 @@ lambda/
 ├── discord_api.py              # Discord API calls (roles, messages)
 ├── dynamodb_operations.py      # DynamoDB operations
 ├── ses_email.py                # AWS SES email sending
+├── ses_notification_handler.py # SES bounce/complaint handling
+├── ses_suppression_list.py     # SES suppression list management
 ├── verification_logic.py       # Pure verification logic functions
+├── validation_utils.py         # Input validation and sanitization
 ├── guild_config.py             # Guild configuration management
-└── ssm_utils.py               # AWS SSM parameter store utils
+├── logging_utils.py            # Safe logging utilities
+└── ssm_utils.py                # AWS SSM parameter store utils
 
 setup-aws.sh                    # Automated AWS deployment script
+cleanup-aws.sh                  # AWS resource cleanup script
 register_slash_commands.py      # Script to register slash commands
+lambda-requirements.txt         # Lambda function dependencies
+requirements-dev.txt            # Development and testing dependencies
 ```
 
 ## Prerequisites
@@ -81,7 +90,7 @@ register_slash_commands.py      # Script to register slash commands
   - SSM parameters
   - API Gateway endpoints
 - **Discord Application** from [Discord Developer Portal](https://discord.com/developers/applications)
-- **Python 3.11** (for local development/testing)
+- **Python 3.11+** (for local development/testing)
 
 ## Setup
 
@@ -285,9 +294,17 @@ aws lambda create-function \
     FROM_EMAIL=noreply@yourdomain.com
   }"
 
+# Note: DISCORD_TOKEN is NOT stored in environment variables for security.
+# It's retrieved from SSM Parameter Store at runtime (/discord-bot/token).
+# AWS_REGION defaults to the Lambda function's region.
+
 # Create Lambda layer for dependencies
-pip install -r requirements.txt -t python/
+mkdir -p python/lib/python3.11/site-packages
+pip install -r lambda-requirements.txt -t python/lib/python3.11/site-packages/
+cd python/lib/python3.11/site-packages && find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
+cd -
 zip -r discord-bot-dependencies.zip python/
+rm -rf python/
 aws lambda publish-layer-version \
   --layer-name discord-bot-dependencies \
   --zip-file fileb://discord-bot-dependencies.zip \
@@ -340,10 +357,13 @@ Run `/setup-email-verification` to configure the bot for your server:
 1. **Select Role** - Choose which role to assign when users verify
 2. **Select Channel** - Choose which channel to post the verification message
 3. **Enter Domains** - Specify allowed email domains (e.g., `yourschool.edu`)
-4. **Create Message** - Either:
+4. **Customize Trigger Message** - Either:
    - Create a message in Discord with emojis and copy the message link
-   - Or skip to keep the existing message (when reconfiguring)
-5. **Preview & Approve** - Review the configuration before it goes live
+   - Or skip to use the default message
+5. **Customize Completion Message** - Either:
+   - Edit the message users see after successful verification
+   - Or skip to use the default completion message
+6. **Preview & Approve** - Review both messages and configuration before posting to channel
 
 ### For Users
 
@@ -357,11 +377,14 @@ Run `/setup-email-verification` to configure the bot for your server:
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/au-discord-bot.git
+git clone https://github.com/offsetkeyz/au-discord-bot.git
 cd au-discord-bot
 
-# Install dependencies
-pip install -r requirements.txt
+# Install Lambda dependencies (for deployment)
+pip install -r lambda-requirements.txt
+
+# Install development dependencies (for testing)
+pip install -r requirements-dev.txt
 
 # Configure environment
 cp .env.example .env
@@ -449,11 +472,15 @@ aws dynamodb scan --table-name discord-verification-records
 
 With typical usage (100 verifications/month):
 
-- **Lambda**: ~$0.20/month (generous estimate)
-- **DynamoDB**: ~$0.25/month (on-demand pricing)
-- **SES**: $0.10/1000 emails = ~$0.01/month
-- **API Gateway**: ~$0.01/month
-- **Total**: < $1/month
+- **Lambda**: ~$0.20/month (generous estimate) - **Free Tier**: 1M requests/month free
+- **DynamoDB**: ~$0.25/month (on-demand pricing) - **Free Tier**: 25GB storage + 25 RCU/WCU free
+- **SES**: $0.10/1000 emails = ~$0.01/month - **Sandbox mode**: Free but limited to verified recipients
+- **API Gateway**: ~$0.01/month - **Free Tier**: 1M API calls/month free for 12 months
+- **SSM Parameter Store**: $0.00 (standard parameters are free)
+- **CloudWatch Logs**: ~$0.01/month for retention
+- **Total**: **< $1/month** (or **$0/month** if within AWS Free Tier)
+
+**Note**: New AWS accounts receive 12 months of Free Tier access which covers typical bot usage entirely. SES starts in sandbox mode (free) but limited to sending emails to verified addresses only.
 
 ## Documentation
 
@@ -471,6 +498,11 @@ Comprehensive documentation is organized in the `docs/` directory:
 - **[SES Compliance Quick Reference](docs/reference/SES_COMPLIANCE_QUICK_REFERENCE.md)** - SES compliance guidelines
 - **[Testing Quick Reference](docs/reference/TESTING_QUICK_REFERENCE.md)** - Quick testing commands and tips
 
+### Contributor Resources
+
+- **[Good First Issues](docs/GOOD_FIRST_ISSUES.md)** - Beginner-friendly tasks for first-time contributors
+- **[AWS Test Setup](docs/AWS_TEST_SETUP.md)** - Set up AWS testing environment for development
+
 ### AWS Operations
 
 - **[SES Operations Runbook](docs/SES_OPERATIONS_RUNBOOK.md)** - Production operations for SES
@@ -487,13 +519,42 @@ Historical implementation docs and completed features are in `docs/archive/`:
 
 ## Contributing
 
-Contributions welcome! Please:
+**We welcome contributions from students and community members!** 🎉
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
+This bot is designed to be extended with new features. Whether you're fixing bugs, adding features, or improving documentation, your contributions are valued.
+
+### Quick Start for Contributors
+
+1. Read the **[Contributing Guide](CONTRIBUTING.md)** for detailed instructions
+2. Check the **[Good First Issues](docs/GOOD_FIRST_ISSUES.md)** guide or browse [GitHub Issues](https://github.com/offsetkeyz/au-discord-bot/issues)
+3. Fork the repo and create a feature branch
+4. Make your changes and write tests
 5. Submit a pull request
+
+### What You Can Contribute
+
+- 🐛 **Bug Fixes**: Found a bug? Fix it and submit a PR!
+- ✨ **New Features**: Add new slash commands, verification methods, or integrations
+- 📚 **Documentation**: Improve guides, add examples, fix typos
+- 🧪 **Tests**: Increase test coverage, add edge cases
+- 🎨 **UX Improvements**: Better error messages, clearer setup flow
+
+### Development Setup
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for:
+- Local development environment setup
+- AWS permissions needed for testing
+- Code style guidelines
+- Testing procedures
+- Pull request process
+
+### AWS Testing Environment
+
+Contributors can test changes with minimal AWS permissions. The contributing guide includes:
+- IAM policy for testing permissions
+- Instructions for setting up test DynamoDB tables
+- How to deploy a test Lambda function
+- LocalStack setup (no AWS account needed)
 
 ## License
 
