@@ -487,13 +487,42 @@ Historical implementation docs and completed features are in `docs/archive/`:
 
 ## Contributing
 
-Contributions welcome! Please:
+**We welcome contributions from students and community members!** 🎉
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
+This bot is designed to be extended with new features. Whether you're fixing bugs, adding features, or improving documentation, your contributions are valued.
+
+### Quick Start for Contributors
+
+1. Read the **[Contributing Guide](CONTRIBUTING.md)** for detailed instructions
+2. Check the [Issues](https://github.com/offsetkeyz/discord-email-verification-bot/issues) for good first issues
+3. Fork the repo and create a feature branch
+4. Make your changes and write tests
 5. Submit a pull request
+
+### What You Can Contribute
+
+- 🐛 **Bug Fixes**: Found a bug? Fix it and submit a PR!
+- ✨ **New Features**: Add new slash commands, verification methods, or integrations
+- 📚 **Documentation**: Improve guides, add examples, fix typos
+- 🧪 **Tests**: Increase test coverage, add edge cases
+- 🎨 **UX Improvements**: Better error messages, clearer setup flow
+
+### Development Setup
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for:
+- Local development environment setup
+- AWS permissions needed for testing
+- Code style guidelines
+- Testing procedures
+- Pull request process
+
+### AWS Testing Environment
+
+Contributors can test changes with minimal AWS permissions. The contributing guide includes:
+- IAM policy for testing permissions
+- Instructions for setting up test DynamoDB tables
+- How to deploy a test Lambda function
+- LocalStack setup (no AWS account needed)
 
 ## License
 
