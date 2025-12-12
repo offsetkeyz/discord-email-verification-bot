@@ -208,21 +208,24 @@ def test_start_verification_user_already_has_role(mock_has_role, mock_param, moc
 @patch('handlers.get_parameter')
 @patch('handlers.user_has_role')
 @patch('handlers.is_user_verified')
-def test_start_verification_already_verified_in_db(mock_verified, mock_has_role, mock_param, mock_role_id, mock_configured):
-    """Test start verification rejects users with existing verification record."""
+@patch('handlers.check_rate_limit')
+def test_start_verification_already_verified_in_db(mock_rate_limit, mock_verified, mock_has_role, mock_param, mock_role_id, mock_configured):
+    """Test start verification allows re-verification if user doesn't have role."""
     mock_configured.return_value = True
     mock_role_id.return_value = '111222'
     mock_param.return_value = 'test_bot_token'
     mock_has_role.return_value = False
-    mock_verified.return_value = True
+    mock_verified.return_value = True  # User is in DB but doesn't have role
+    mock_rate_limit.return_value = (True, 0)  # Not rate limited
 
     response = handle_start_verification('789012', '123456')
 
+    # Should show email modal (allow re-verification)
     assert response['statusCode'] == 200
     body = json.loads(response['body'])
-    assert body['data']['flags'] == MessageFlags.EPHEMERAL
-    assert 'already verified' in body['data']['content']
-    mock_verified.assert_called_once_with('789012', '123456')
+    assert body['type'] == InteractionResponseType.MODAL
+    # Database check is no longer performed - only role check matters
+    mock_verified.assert_not_called()
 
 
 @pytest.mark.unit
@@ -349,7 +352,8 @@ def test_start_verification_success_path(mock_rate_limit, mock_verified, mock_ha
     mock_configured.assert_called_once_with('123456')
     mock_role_id.assert_called_once_with('123456')
     mock_has_role.assert_called_once()
-    mock_verified.assert_called_once()
+    # Database verification check is no longer performed
+    mock_verified.assert_not_called()
     mock_rate_limit.assert_called_once()
 
 

@@ -455,6 +455,36 @@ With typical usage (100 verifications/month):
 - **API Gateway**: ~$0.01/month
 - **Total**: < $1/month
 
+## Documentation
+
+Comprehensive documentation is organized in the `docs/` directory:
+
+### Operational Guides
+
+- **[Deployment Checklist](docs/guides/DEPLOYMENT_CHECKLIST.md)** - Step-by-step deployment guide
+- **[Discord Testing Guide](docs/guides/DISCORD_TESTING_GUIDE.md)** - Testing procedures and workflows
+- **[SES Deployment Checklist](docs/guides/SES_DEPLOYMENT_CHECKLIST.md)** - AWS SES setup and configuration
+- **[Setup Script Usage](docs/guides/SETUP_SCRIPT_USAGE.md)** - How to use the automated setup script
+
+### Quick References
+
+- **[SES Compliance Quick Reference](docs/reference/SES_COMPLIANCE_QUICK_REFERENCE.md)** - SES compliance guidelines
+- **[Testing Quick Reference](docs/reference/TESTING_QUICK_REFERENCE.md)** - Quick testing commands and tips
+
+### AWS Operations
+
+- **[SES Operations Runbook](docs/SES_OPERATIONS_RUNBOOK.md)** - Production operations for SES
+- **[SES Setup Guide](docs/SES_SETUP_GUIDE.md)** - Complete SES configuration guide
+- **[SES Testing Guide](docs/SES_TESTING_GUIDE.md)** - Testing SES email delivery
+
+### Archived Documentation
+
+Historical implementation docs and completed features are in `docs/archive/`:
+- `docs/archive/features/` - Feature implementation summaries
+- `docs/archive/development/` - Development roadmaps and summaries
+- `docs/archive/testing-phase/` - Test reports and results
+- `docs/archive/fixes/` - Historical bug fixes and patches
+
 ## Contributing
 
 Contributions welcome! Please:

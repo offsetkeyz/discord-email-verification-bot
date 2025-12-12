@@ -358,7 +358,7 @@ class TestEmailReusePrevention:
 
     @freeze_time("2025-01-15 10:00:00")
     def test_verified_user_cannot_verify_again_same_guild(self, integration_mock_env, setup_test_guild, lambda_context):
-        """Test that already-verified users cannot create new sessions."""
+        """Test that users with the verified role are blocked from re-verifying."""
         guild = setup_test_guild
         user_id = 'user_verified'
 
@@ -373,21 +373,16 @@ class TestEmailReusePrevention:
             assert is_user_verified(user_id, guild['guild_id']) is True
 
             # Try to verify again (after cooldown)
+            # This time user HAS the role
             with freeze_time("2025-01-15 10:10:00"):
-                # Mock user_has_role to return False (simulating DB check)
-                with patch('handlers.user_has_role', return_value=False):
+                with patch('handlers.user_has_role', return_value=True):
                     button_event = create_button_click_event('start_verification', user_id, guild['guild_id'])
                     response = lambda_handler(button_event, lambda_context)
 
                     body = json.loads(response['body'])
-                    # Should either block or show already verified message
                     assert response['statusCode'] == 200
-                    # If DB check is working, should see "already verified"
-                    if 'already verified' in body['data']['content'].lower():
-                        assert True
-                    else:
-                        # May allow modal but that's acceptable
-                        assert body['type'] == 4  # MODAL allowed
+                    # User with role should be blocked with "already have the verified role" message
+                    assert 'already have the verified role' in body['data']['content'].lower()
 
 
 # ==============================================================================

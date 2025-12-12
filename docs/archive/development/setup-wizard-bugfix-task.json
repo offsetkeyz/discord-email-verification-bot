@@ -1,0 +1,97 @@
+{
+  "task_id": "setup-wizard-bugfix-pr",
+  "assigned_to": "backend-developer",
+  "requested_by": "project-manager",
+  "priority": "high",
+  "task_type": "pull_request_creation",
+  "context": {
+    "issue_type": "critical_bug",
+    "functionality_impacted": "setup_wizard",
+    "deployment_status": "deployed_and_ready_for_testing",
+    "branch": "phase-4-e2e-deployment-tests",
+    "target_branch": "main"
+  },
+  "requirements": {
+    "primary_objective": "Create a pull request for setup wizard UUID validation bug fixes",
+    "deliverables": [
+      "Comprehensive PR description with bug analysis",
+      "Clear before/after comparison",
+      "Impact assessment and risk analysis",
+      "Testing notes and validation steps",
+      "Conventional commit format compliance"
+    ]
+  },
+  "bug_details": {
+    "root_cause": "Setup wizard was generating setup_id as '{user_id}_{guild_id}' but validation function expected UUID format",
+    "error_message": "ERROR: Invalid custom_id format. Expected: setup_message_link_<setup_id>",
+    "impact": "Complete setup wizard failure at message link submission step - blocking all new server setups",
+    "severity": "critical"
+  },
+  "files_modified": {
+    "lambda/setup_handler.py": {
+      "changes": [
+        "Added 'import uuid' statement",
+        "Changed setup_id generation from f'{user_id}_{guild_id}' to str(uuid.uuid4()) at line 370",
+        "Updated all store_pending_setup calls to include user_id and guild_id parameters",
+        "Updated all get_pending_setup calls to pass guild_id parameter",
+        "Updated delete_pending_setup call to pass guild_id parameter",
+        "Fixed handle_message_modal_submit to reuse existing setup_id instead of creating new one"
+      ],
+      "rationale": "Align setup_id generation with validation expectations and improve data consistency"
+    },
+    "lambda/dynamodb_operations.py": {
+      "changes": [
+        "Updated store_pending_setup function signature to accept user_id and guild_id parameters",
+        "Changed database storage to use 'setup_{setup_id}' as user_id key",
+        "Added setup_id and admin_user_id fields to stored data",
+        "Updated get_pending_setup to accept optional guild_id parameter with backward compatibility",
+        "Updated delete_pending_setup to accept optional guild_id parameter with backward compatibility"
+      ],
+      "rationale": "Maintain backward compatibility while improving data model to support UUID-based setup tracking"
+    }
+  },
+  "testing_status": {
+    "deployment": "Deployed to AWS Lambda successfully",
+    "validation": "Fix resolves the validation error",
+    "user_testing": "Ready for end-to-end testing",
+    "regression_risk": "Low - backward compatibility maintained"
+  },
+  "pr_specifications": {
+    "title": "Fix: Setup wizard UUID validation error in message link submission",
+    "conventional_commit_type": "fix",
+    "scope": "setup-wizard",
+    "breaking_change": false,
+    "labels_suggested": ["bug", "high-priority", "setup-wizard", "backend"],
+    "reviewers_needed": "backend-developer, devops-engineer"
+  },
+  "documentation_requirements": [
+    "Explain the UUID format requirement clearly",
+    "Document the backward compatibility approach",
+    "Include error message samples",
+    "Provide testing instructions for QA",
+    "Note any database schema implications"
+  ],
+  "success_criteria": [
+    "PR created with comprehensive description",
+    "All modified files included and explained",
+    "Clear bug reproduction steps documented",
+    "Testing validation steps provided",
+    "No merge conflicts with main branch",
+    "Conventional commit format followed",
+    "Impact assessment completed"
+  ],
+  "additional_context": {
+    "recent_commits": [
+      "93c94bd Test: Step 2 AWS resources verification - All passed (8/8)",
+      "605df49 Docs: Add setup script final status summary",
+      "e0e7f6d Fix: Use manylinux wheels for Lambda layer to prevent GLIBC errors"
+    ],
+    "current_phase": "phase-4-e2e-deployment-tests",
+    "project_status": "Production readiness verification"
+  },
+  "timeline": {
+    "requested": "2025-12-10",
+    "expected_completion": "immediate",
+    "urgency": "high - blocks critical user functionality"
+  }
+}
