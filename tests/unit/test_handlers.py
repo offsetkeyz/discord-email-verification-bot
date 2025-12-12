@@ -208,13 +208,15 @@ def test_start_verification_user_already_has_role(mock_has_role, mock_param, moc
 @patch('handlers.get_parameter')
 @patch('handlers.user_has_role')
 @patch('handlers.is_user_verified')
-def test_start_verification_already_verified_in_db(mock_verified, mock_has_role, mock_param, mock_role_id, mock_configured):
+@patch('handlers.check_rate_limit')
+def test_start_verification_already_verified_in_db(mock_rate_limit, mock_verified, mock_has_role, mock_param, mock_role_id, mock_configured):
     """Test start verification allows re-verification if user doesn't have role."""
     mock_configured.return_value = True
     mock_role_id.return_value = '111222'
     mock_param.return_value = 'test_bot_token'
     mock_has_role.return_value = False
     mock_verified.return_value = True  # User is in DB but doesn't have role
+    mock_rate_limit.return_value = (True, 0)  # Not rate limited
 
     response = handle_start_verification('789012', '123456')
 
